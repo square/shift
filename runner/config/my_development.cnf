@@ -1,0 +1,7 @@
+[client]
+user     = root
+password =
+ssl      =
+ssl-cert =
+ssl-key  =
+ssl-ca   =

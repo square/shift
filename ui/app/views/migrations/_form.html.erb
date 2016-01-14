@@ -1,0 +1,124 @@
+<h2><%= @migration.persisted? ? "Edit" : "New" %> Migration Request</h2>
+<center>
+  <span class="new-bubble">new</span>
+  need to run a migration on multiple shards? <a href="/meta_requests/new">click here</a>
+</center>
+
+<div class="col-md-10 col-md-offset-1" id="form-table">
+  <div class="row">
+
+    <%= form_for @migration, url: formurl, html: { class: 'form-horizontal submit-migration-form' } do |f| %>
+
+    <% if @migration.errors.any? %>
+      <div class="alert alert-danger">
+        <strong>Request is not complete!</strong>
+        <ul>
+        <% @migration.errors.full_messages.each do |error| %>
+          <li><%= error %></li>
+        <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="form-group">
+      <%= f.label :cluster_name, 'cluster', class: 'col-md-3 control-label' %>
+      <div class="col-md-7">
+        <select id='form_<%= @migration.persisted? ? "edit" : "new" %>_migration_request_cluster_name'
+          class='select-search form-control' name="form_<%= @migration.persisted? ? "edit" : "new" %>_migration_request[cluster_name]" data-width="100%">
+          <option></option>
+          <optgroup label = "staging">
+          <% Form::MigrationRequest.all_clusters.each do |cluster| %>
+            <% next unless cluster.is_staging? %>
+            <% if cluster.name == @migration.cluster_name %>
+              <option selected><%= cluster.name %></option>
+            <% else %>
+              <option><%= cluster.name %></option>
+            <% end %>
+          <% end %>
+          </optgroup>
+          <optgroup label = "production">
+          <% Form::MigrationRequest.all_clusters.each do |cluster| %>
+            <% next if cluster.is_staging? %>
+            <% if cluster.name == @migration.cluster_name %>
+              <option selected><%= cluster.name %></option>
+            <% else %>
+              <option><%= cluster.name %></option>
+            <% end %>
+          <% end %>
+          </optgroup>
+        </select>
+        <span class="help-block">Clusters must be defined in the shift database.</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <%= f.label :database, 'database', class: 'col-md-3 control-label', rows: 2 %>
+      <div class="col-md-7">
+        <select id='form_<%= @migration.persisted? ? "edit" : "new" %>_migration_request_database'
+          class='select-search form-control' name="form_<%= @migration.persisted? ? "edit" : "new" %>_migration_request[database]" data-width="100%">
+          <option></option>
+          <% if @migration.cluster_name then %>
+            <% MysqlHelper.safe_databases(@migration.cluster_name).each do |database| %>
+              <% if database == @migration.database %>
+                <option selected><%= database %></option>
+              <% else %>
+                <option><%= database %></option>
+              <% end %>
+            <% end %>
+          <% end %>
+        </select>
+        <span class="help-block">The database that your migration will be run on.</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <%= f.label :ddl_statement, 'DDL statement', class: 'col-md-3 control-label', rows: 2 %>
+      <div class="col-md-7">
+        <%= f.text_area :ddl_statement, class: 'form-control' %>
+        <span class="help-block">This is what online-schema-change will actually run.
+          Query must be a single DDL statement. References:
+          <div class="tab">
+            <table>
+              <tr>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/create-table.html" target="_blank">create table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/create-view.html" target="_blank">create view</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/alter-table.html" target="_blank">alter table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/drop-table.html" target="_blank">drop table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/drop-view.html" target="_blank">drop view</a></td>
+              </tr>
+            </table>
+          </div>
+        </span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <%= f.label :pr_url, 'pr url', class: 'col-md-3 control-label' %>
+      <div class="col-md-7">
+        <%= f.text_field :pr_url, class: 'form-control' %>
+        <span class="help-block">The link to the PR url.</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <%= f.label :final_insert, 'final insert', class: 'col-md-3 control-label', rows: 2 %>
+      <div class="col-md-7">
+        <%= f.text_area :final_insert, class: 'form-control' %>
+        <span class="help-block">Optional. An insert to run at the end of your migration (ex: insert into schema_migrations).
+          Must begin with 'INSERT INTO ', and cannot contain a ';' (semicolon).</span>
+      </div>
+    </div>
+
+    <% if @migration.dao %>
+      <%= f.hidden_field :lock_version, :value => @migration.dao.lock_version %>
+    <% end %>
+
+    <div class="form-group">
+      <div class="col-md-offset-3 col-md-9">
+        <%= f.submit submit_text + " Migration", class: 'btn btn-primary', id: 'migration_request_submit' %>
+      </div>
+    </div>
+  <% end %>
+
+  </div>
+</div>

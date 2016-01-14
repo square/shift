@@ -1,0 +1,267 @@
+<div id="migration-detail">
+<br>
+<h2>Status
+  <span class="label label-<%= @status.label %> large-label"><%= @status.description %></span>
+  <div class="pull-right">
+    <% if show_edit? %>
+      <%= link_to "Edit", edit_migration_path(@migration), class: 'btn btn-primary' %>
+    <% end %>
+    <%= link_to "Clone", new_migration_path(:cluster_name => @migration.cluster_name, :database => @migration.database,
+                                            :ddl_statement => @migration.ddl_statement, :pr_url => @migration.pr_url,
+                                            :final_insert => @migration.final_insert), class: 'btn btn-default' %>
+  </div>
+</h2>
+<hr>
+
+<% if show_failure? %>
+<div class="col-md-12 col-md-offsets-3">
+  <div class="alert alert-danger col-md-8 col-md-offset-2">
+    Error message: <%= @migration[:error_message] %>
+  </div>
+</div>
+<% end %>
+
+<% %w(started_at completed_at).each do |field| %>
+<div class="row detail_data">
+  <div class="col-md-2 col-md-offset-3"><strong><%= field.gsub(/_/, ' ') %></strong></div>
+  <div class="col-md-6"><%= @migration[field] %></div>
+</div>
+<% end %>
+
+<% if use_ptosc? %>
+  <div class="row detail_data">
+    <div class="col-md-2 col-md-offset-3"><strong>copy percentage</strong></div>
+    <div id="progressBar<%= @migration.id %>" class="progressBar progressBar_detail" data-value="<%= @migration.copy_percentage %>"
+      status="<%= @migration.status %>">
+      <div></div>
+    </div>
+  </div>
+  <div class="row detail_data">
+    <div class="col-md-offset-5" id="status_image"><a href="/status_image/<%= @migration.id %>.png">linkable status image</a></div>
+  </div>
+<% end %>
+
+<h2>Request</h2>
+<hr>
+
+<% if action_type == :create %>
+  <% field_list = %w(id meta_request_id requestor created_at updated_at cluster_name database table ddl_statement pr_url final_insert
+       approved_by approved_at cluster_owners) %>
+<% elsif action_type == :drop %>
+  <% field_list = %w(id meta_request_id requestor created_at updated_at cluster_name database table ddl_statement pr_url final_insert
+       table_rows_start table_size_start index_size_start approved_by approved_at cluster_owners) %>
+<% else %>
+  <% field_list = %w(id meta_request_id requestor created_at updated_at cluster_name database table ddl_statement pr_url final_insert
+       table_rows_start table_size_start index_size_start table_rows_end table_size_end
+       index_size_end approved_by approved_at cluster_owners) %>
+<% end %>
+<% field_list.each do |field| %>
+  <div class="row detail_data">
+    <div class="col-md-2 col-md-offset-3"><strong><%= field.gsub(/_/, ' ') %></strong></div>
+    <% if field == "meta_request_id" %>
+      <% if @migration.meta_request_id %>
+        <div class="col-md-6"><%= link_to @migration.meta_request_id, "/meta_requests/" + @migration.meta_request_id.to_s %></div>
+      <% end %>
+    <% elsif field == "pr_url" %>
+      <div class="col-md-6 wrap-text"><%= link_to @migration.pr_url, @migration.pr_url %></div>
+    <% elsif %w(table_size_start index_size_start table_size_end index_size_end).include?(field) %>
+      <div class="col-md-6"><%= number_to_human_size(@migration[field]) %></div>
+    <% elsif %w(table_rows_start table_rows_end).include?(field) %>
+      <div class="col-md-6"><%= number_with_delimiter(@migration[field]) %></div>
+    <% elsif field == "ddl_statement" %>
+      <div class="col-md-6" id="migration-ddl"><%= @migration.ddl_statement.pretty_format_sql %></div>
+    <% elsif field == "table" %>
+      <div class="col-md-6" id="migration-table"><%= @migration.parsed[:table] %></div>
+    <% elsif field == "cluster_owners" %>
+      <div class="col-md-6"><%= @migration.cluster.owners.collect(&:username).join(", ") %></div>
+    <% else %>
+      <div class="col-md-6" id="migration-<%= field %>"><%= @migration[field] %></div>
+    <% end %>
+  </div>
+<% end %>
+<% if use_ptosc? %>
+  <div class="row detail_data">
+    <div class="col-md-2 col-md-offset-3"><strong>ptosc log file</strong></div>
+    <div class="col-md-6"><%= link_to "link", '/ptosc_log_file/' + @migration.id.to_s %></div>
+  </div>
+<% end %>
+
+<% if migration_in_progress? %>
+<div id="action-sction"></div>
+<h2>Actions</h2>
+<hr>
+
+  <% if show_delete? %>
+    <div class="row detail_button">
+      <div class="col-md-1 col-md-offset-3">
+        <%= button_to "delete", migration_path(@migration, :lock_version => @migration.lock_version), :method => 'delete', :class => 'btn btn-default btn-lg', data: {confirm: 'Are you sure you want to delete this migration?' } %>
+      </div>
+      <div class="col-md-3 col-md-offset-1">
+        <span class="help-block helper-text">Delete a request that hasn't been started. Owners of this cluster, admins, and the original requestor can see this button.</span>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @status.action %>
+    <% unless @migration.parsed[:error] %>
+      <% if show_approve? %>
+        <% if @migration.parsed[:run] == :short %>
+          <div class="row detail_button">
+            <div class="col-md-1 col-md-offset-3">
+              <%= button_to "#{@status.action}",
+                                approve_migration_path(@migration, :lock_version => @migration.lock_version, :runtype => Migration.types[:run][:short]),
+                              :method => 'post',
+                              :class => 'btn btn-info btn-lg',
+                              data: {confirm: 'Approve the migration?' } %>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">Approve the migration.</span>
+            </div>
+          </div>
+        <% elsif @migration.parsed[:run] == :maybeshort && policy(@migration).approve_dangerous? %>
+          <div class="row detail_button">
+            <div class="col-md-1 col-md-offset-3">
+              <%= button_to "#{@status.action} (short)",
+                                approve_migration_path(@migration, :lock_version => @migration.lock_version, :runtype => Migration.types[:run][:short]),
+                              :method => 'post',
+                              :class => 'btn btn-info btn-lg',
+                              data: {confirm: 'Approve the migration?' } %>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">Approve the migration for a short run. Only admins can click this button.</span>
+            </div>
+          </div>
+        <% elsif @migration.parsed[:run] == :maybenocheckalter && policy(@migration).approve_dangerous? %>
+          <div class="row detail_button">
+            <div class="col-md-2 col-md-offset-2">
+              <%= button_to "#{@status.action} (nocheck-alter)",
+                                approve_migration_path(@migration, :lock_version => @migration.lock_version, :runtype => Migration.types[:run][:nocheckalter]),
+                              :method => 'post',
+                              :class => 'btn btn-info btn-lg',
+                              data: {confirm: 'Approve the migration?' } %>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">Approve the migration to be run with --nocheck-alter. Only admins can click this button.</span>
+            </div>
+          </div>
+        <% elsif @migration.parsed[:run] == :maybenocheckalter %>
+          <div class="row detail_button">
+            <div class="col-md-2 col-md-offset-2">
+              <div class="btn btn-info btn-lg" disabled="disabled"><%= "#{@status.action} (change column)" %></div>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">This migration changes a column name and therefore must be approved by an admin.</span>
+            </div>
+          </div>
+        <% end %>
+        <% if @migration.parsed[:run] == :maybeshort ||
+              @migration.parsed[:run] == :long %>
+          <div class="row detail_button">
+            <div class="col-md-1 col-md-offset-3">
+              <%= button_to "#{@status.action}",
+                                approve_migration_path(@migration, :lock_version => @migration.lock_version, :runtype => Migration.types[:run][:long]),
+                              :method => 'post',
+                              :class => 'btn btn-info btn-lg',
+                              data: {confirm: 'Approve the migration?' } %>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">Approve the migration.</span>
+            </div>
+          </div>
+        <% end %>
+      <% elsif show_start? %>
+        <% if is_blocked? %>
+          <div class="row detail_button">
+            <div class="col-md-1 col-md-offset-3">
+              <div class="btn btn-info btn-lg" disabled="disabled">start</div>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">This is currently disabled because you are already running the maximum #
+                of migrations per cluster (<%= Migration.parallel_run_limit %>).</span>
+            </div>
+          </div>
+        <% else %>
+          <div class="row detail_button">
+            <div class="col-md-1 col-md-offset-3">
+              <%= button_to "#{@status.action}", start_migration_path(@migration, :lock_version => @migration.lock_version),
+                             :method => 'post', :class => 'btn btn-info btn-lg',
+                             :data => {confirm: 'Start the migration?' } %>
+            </div>
+            <div class="col-md-3 col-md-offset-1">
+              <span class="help-block helper-text">Start the migration. Only owners of this cluster and admins can see this button.</span>
+            </div>
+          </div>
+        <% end %>
+      <% elsif show_pause? %>
+        <div class="row detail_button">
+          <div class="col-md-1 col-md-offset-3">
+            <%= button_to "#{@status.action}", pause_migration_path(@migration),
+                           :method => 'post', :class => 'btn btn-info btn-lg',
+                           :data => {confirm: 'Pause the migration?' } %>
+          </div>
+          <div class="col-md-3 col-md-offset-1">
+            <span class="help-block helper-text">Pause the migration. Only owners of this cluster and admins can see this button.</span>
+          </div>
+        </div>
+      <% elsif show_rename? %>
+        <div class="row detail_button">
+          <div class="col-md-1 col-md-offset-3">
+            <%= button_to "#{@status.action}", rename_migration_path(@migration, :lock_version => @migration.lock_version),
+                           :method => 'post', :class => 'btn btn-info btn-lg',
+                           :data => {confirm: 'Rename the tables?' } %>
+          </div>
+          <div class="col-md-3 col-md-offset-1">
+            <span class="help-block helper-text">Rename the tables. Only owners of this cluster and admins can see this button.</span>
+          </div>
+        </div>
+      <% elsif show_resume? %>
+        <div class="row detail_button">
+          <div class="col-md-1 col-md-offset-3">
+            <%= button_to "#{@status.action}", resume_migration_path(@migration, :lock_version => @migration.lock_version),
+                           :method => 'post', :class => 'btn btn-info btn-lg',
+                           :data => {confirm: 'Resume the migration?' } %>
+          </div>
+          <div class="col-md-3 col-md-offset-1">
+            <span class="help-block helper-text"><%= @status.action.capitalize %> the migration. This will pickup from where the migration left off and you
+              won't lose any progress. HOWEVER, the copy percentage you see above will reset based on the amount of work left.
+              Only owners of this cluster and admins can see this button.</span>
+          </div>
+        </div>
+      <% elsif show_dequeue? %>
+        <div class="row detail_button">
+          <div class="col-md-1 col-md-offset-3">
+            <%= button_to "#{@status.action}", dequeue_migration_path(@migration, :lock_version => @migration.lock_version),
+                           :method => 'post', :class => 'btn btn-info btn-lg',
+                           :data => {confirm: 'Remove the migration from the run queue?' } %>
+          </div>
+          <div class="col-md-3 col-md-offset-1">
+            <span class="help-block helper-text">Remove the migration from the run queue. Only owners of this cluster and admins can see this button.</span>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if show_unapprove? %>
+    <div class="row detail_button">
+      <div class="col-md-1 col-md-offset-3">
+        <%= button_to "unapprove", unapprove_migration_path(@migration, :lock_version => @migration.lock_version), :method => 'post', :class => 'btn btn-default btn-lg' %>
+      </div>
+      <div class="col-md-3 col-md-offset-1">
+        <span class="help-block helper-text">Unapprove the migration. Only owners of this cluster and admins can see this button.</span>
+      </div>
+    </div>
+  <% end %>
+
+  <% if show_cancel? %>
+    <div class="row detail_button">
+      <div class="col-md-1 col-md-offset-3">
+        <%= button_to "cancel", cancel_migration_path(@migration), :method => 'post', :class => 'btn btn-default btn-lg', data: {confirm: 'ARE YOU SURE YOU WANT TO STOP THE MIGRATION?'} %>
+      </div>
+      <div class="col-md-3 col-md-offset-1">
+        <span class="help-block helper-text">Cancel the migration. Only owners of this cluster and admins can see this button.</span>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+</div>

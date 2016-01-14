@@ -1,0 +1,27 @@
+<section id="migrations">
+  <%= render "migrations/filter_header" if @show_filter %>
+
+  <%= render "migrations/migrations_table", :title => "Migrations In Progress", :count => @counts["running"],
+    :columns => %w(id started_at cluster_name requestor ddl_statement approved_by copy_percentage status), :link => "running",
+    :migrations => @migrations["running"] if @migrations["running"] %>
+
+  <%= render "migrations/migrations_table", :title => "Pending Migrations", :count => @counts["pending"],
+    :columns => %w(id created_at cluster_name requestor ddl_statement approved_by status), :link => "pending",
+    :migrations => @migrations["pending"] if @migrations["pending"] %>
+
+  <%= render "migrations/migrations_table", :title => "Completed Migrations", :count => @counts["completed"],
+    :columns => %w(id completed_at cluster_name requestor ddl_statement approved_by started_at status), :link => "completed",
+    :migrations => @migrations["completed"] if @migrations["completed"] %>
+
+  <%= render "migrations/migrations_table", :title => "Canceled Migration", :count => @counts["canceled"],
+    :columns => %w(id created_at cluster_name requestor ddl_statement approved_by status), :link => "canceled",
+    :migrations => @migrations["canceled"] if @migrations["canceled"] %>
+
+  <%= render "migrations/migrations_table", :title => "Failed Migration", :count => @counts["failed"],
+    :columns => %w(id updated_at cluster_name requestor ddl_statement approved_by status), :link => "failed",
+    :migrations => @migrations["failed"] if @migrations["failed"] %>
+
+  <%= render "migrations/migrations_table", :title => "Awaiting Approval", :count => @counts["awaiting_approval"],
+    :columns => %w(id created_at cluster_name requestor ddl_statement approved_by status), :link => "awaiting_approval",
+    :migrations => @migrations["awaiting_approval"] if @migrations["awaiting_approval"] %>
+</section>

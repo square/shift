@@ -1,0 +1,130 @@
+<div id="flow-section">
+  <h4>Migration Flow</h4>
+  <hr>
+  <div class="row">
+    <div class="col-md-2 col-md-offset-1">
+      <span class="label label-warning">preparing migration</span>
+    </div>
+    <div class="col-md-1">
+      <img src="/arrow1.png">
+    </div>
+    <div class="col-md-2">
+      <span class="label label-info">awaiting approval</span>
+    </div>
+    <div class="col-md-1">
+      <img src="/arrow1.png">
+    </div>
+    <div class="col-md-2">
+      <span class="label label-info">awaiting start</span>
+    </div>
+    <div class="col-md-1">
+      <img src="/arrow1.png">
+    </div>
+    <div class="col-md-2">
+      <span class="label label-warning">running migration</span>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-2 col-md-offset-1">
+      <span class="help-block helper-text">The migration has just been created, and table stats (ex: table rows, table size, etc.) are being collected.</span>
+    </div>
+    <div class="col-md-2 col-md-offset-1">
+      <span class="help-block helper-text">The migration is now awaiting approval from an admin, who should review the ddl statement and table stats to determine whether or not the migration is safe.</span>
+    </div>
+    <div class="col-md-2 col-md-offset-1">
+      <span class="help-block helper-text">The migration has been approved and is now waiting to be started by an admin.</span>
+      <div>
+        <span class="label label-purple">enqueued</span>
+        <span class="help-block helper-text">The mig has been queued up to run automatically (meta requests only).</span>
+      </div>
+    </div>
+      <div class="col-md-2 col-md-offset-1">
+        <% if use_ptosc? %>
+          <span class="help-block helper-text">The migration has been started and is now running on the database. The 'copy percentage' will update with the percent of rows copied.</span>
+        <% else %>
+          <span class="help-block helper-text">The migration has been started and is now running on the database.</span>
+        <% end %>
+      </div>
+  </div>
+
+  <div id="long-arrow">
+    <img src="/arrow2.png">
+  </div>
+
+  <% if use_ptosc? %>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-1">
+        <span class="label label-info">awaiting rename</span>
+      </div>
+      <div class="col-md-1">
+        <img src="/arrow1.png">
+      </div>
+      <div class="col-md-2">
+        <span class="label label-warning">rename in progress</span>
+      </div>
+      <div class="col-md-1">
+        <img src="/arrow1.png">
+      </div>
+      <div class="col-md-2">
+        <span class="label label-success">completed</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">All rows in the migration have been copied to the temporary table. The migration is now waiting on an admin to switch the old table with the new one.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">The rename has been started and is now running on the database.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+          <span class="help-block helper-text">The migration is complete.</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-4">
+        <span class="label label-danger">error</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="label label-danger">failed</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="label label-danger">canceled</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-4">
+        <span class="help-block helper-text">There was an error during the running step that can potentially be recovered from.
+          From here you can either retry the migration from where it last left off, or cancel it and destroy all progress.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">The migration failed. If it hadn't been started yet, you can edit it and try to run it again. If it had already been started, please contact an admin. This can happen at any step.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">The migration was canceled by an admin. This can happen anytime after the migration starts running.</span>
+      </div>
+    </div>
+  <% else %>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-1">
+        <span class="label label-success">completed</span>
+      </div>
+      <div class="col-md-2 col-md-offset-4">
+        <span class="label label-danger">failed</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="label label-danger">canceled</span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">The migration is complete.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-4">
+        <span class="help-block helper-text">The migration failed. If it hadn't been started yet, you can edit it and try to run it again. If it had already been started, please contact an admin. This can happen at any step.</span>
+      </div>
+      <div class="col-md-2 col-md-offset-1">
+        <span class="help-block helper-text">The migration was canceled by an admin. This can happen at any step.</span>
+      </div>
+    </div>
+  <% end %>
+</div>

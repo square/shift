@@ -1,0 +1,69 @@
+source 'https://rubygems.org'
+
+# Bundle edge Rails instead: gem 'rails', github: 'rails/rails'
+gem 'rails', '4.2.5'
+# Use mysql as the database for Active Record
+gem 'mysql2'
+
+# bootstrap
+gem 'twitter-bootstrap-rails'
+# Use jquery as the JavaScript library
+gem 'jquery-rails'
+# bundle exec rake doc:rails generates the API under doc/api.
+gem 'sdoc', '~> 0.4.0', group: :doc
+
+# parse ddl statements
+gem 'mysql-parser', '~> 0.0.3'
+gem 'json'
+gem 'kaminari'
+gem 'bootstrap-kaminari-views'
+# format ddl statements
+gem 'anbt-sql-formatter'
+gem 'rufus-scheduler'
+# authorization
+gem 'pundit'
+
+gem 'nokogiri'
+# Use Uglifier as compressor for JavaScript assets
+gem 'uglifier'
+gem 'therubyracer'
+gem "libv8"
+
+# create images from html
+gem 'wkhtmltoimage-binary'
+gem 'imgkit'
+
+group :development, :test do
+  gem 'cane'
+end
+
+group :development do
+  # Access an IRB console on exception pages or by using <%= console %> in views
+  gem 'web-console', '~> 2.0'
+  # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
+  gem 'spring'
+  gem 'foreman'
+end
+
+group :test do
+  # Don't require rspec-rails, since we don't want to use the built in tasks.
+  gem 'rspec-rails', :require => false
+  gem 'capybara',    :require => false
+  gem 'fabrication', :require => false
+  gem 'factory_girl_rails', :require => false
+
+  gem 'database_cleaner' #, :git => 'https://github.com/bmabey/database_cleaner.git'
+
+  # Call 'byebug' anywhere in the code to stop execution and get a debugger console
+  gem 'byebug'
+  gem 'poltergeist'
+
+  # Used for service fakes
+  gem 'sinatra', :require => false
+
+  gem 'fdoc'
+
+  platforms :ruby do
+    gem 'simplecov'
+  end
+end

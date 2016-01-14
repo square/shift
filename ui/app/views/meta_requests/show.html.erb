@@ -1,0 +1,130 @@
+  <div class="migration-section">
+    <h3>Meta Request <%= @meta_request.id %><span class="count">(<%= @meta_request.migrations.length %>)</span>
+      <% if @editable || @deleteable %>
+        <div class="pull-right">
+          <% if @editable %>
+            <%= link_to "Edit", edit_meta_request_path(@meta_request), class: 'btn btn-primary' %>
+          <% end %>
+          <% if @deleteable %>
+            <%= link_to "Delete", meta_request_path(@meta_request), :method => 'delete', class: 'btn btn-default',
+              data: {confirm: 'Are you sure you want to delete this meta request?'} %>
+          <% end %>
+        </div>
+      <% end %>
+    </h3>
+
+    <div id="meta_request_header">
+      <div class="row detail_data">
+        <div class="col-md-2 col-md-offset-2"><strong>ddl statement</strong></div>
+        <div class="col-md-5">
+          <div id="migration-ddl"><%= @meta_request.ddl_statement.pretty_format_sql %></div>
+        </div>
+      </div>
+      <div class="row detail_data">
+        <div class="col-md-2 col-md-offset-2"><strong>pr url</strong></div>
+        <div class="col-md-5">
+          <a href="<%= @meta_request.pr_url %>"><%= @meta_request.pr_url %></a>
+        </div>
+      </div>
+      <div class="row detail_data">
+        <div class="col-md-2 col-md-offset-2"><strong>final insert</strong></div>
+        <div class="col-md-5">
+          <%= @meta_request.final_insert %>
+        </div>
+      </div>
+      <div class="row detail_data">
+        <div class="col-md-2 col-md-offset-2"><strong>requestor</strong></div>
+        <div class="col-md-5">
+          <%= @meta_request.requestor %>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-danger" id="bulk_error" hidden>
+      <strong>Bulk action failed!</strong>
+      <ul>
+        <li>There was an error. Most likely, one of the migrations you tried to modify was updated between the time you
+            loaded the page and the time you applied the bulk action.</li>
+      </ul>
+    </div>
+
+    <div class="alert alert-success" id="bulk_success" hidden>
+      <strong>Bulk action succeeded!</strong>
+    </div>
+
+    <ul class="nav nav-pills" id="bulk_action_menu">
+      <li class="dropdown">
+        <a id="drop4" role="button" data-toggle="dropdown" href="#">Bulk Action <b class="caret"></b></a>
+        <ul id="bulk_action_menu_list" class="dropdown-menu" role="menu" aria-labelledby="bulk_action_menu_list">
+
+        <% if @available_actions.empty?%>
+          <li role="presentation" action="">
+            <span role="menuitem" tabindex="-1" class="disabled">n/a</span></li>
+        <% end %>
+
+        <% @available_actions.each do |action| %>
+          <% next if [:cancel, :delete].include?(action) %>
+          <li role="presentation" action="<%= Migration.actions[action] %>">
+            <span role="menuitem" tabindex="-1" class="disabled">
+              <% if action == :approve_long %>
+                approve
+              <% elsif action == :approve_short %>
+                <% if (@available_actions & [:approve_long, :approve_nocheckalter]).any? %>
+                  approve (short)
+                <% else %>
+                  approve
+                <% end %>
+              <% elsif action == :approve_nocheckalter %>
+                approve (nocheck alter)
+              <% else %>
+                <%= action %>
+              <% end %>
+            </span></li>
+        <% end %>
+
+        <% if (@available_actions & [:delete, :cancel]).any? %>
+          <% if (@available_actions - [:delete, :cancel]).any? %>
+            <div role="presentation" class="divider"></div>
+          <% end %>
+          <% if @available_actions.include?(:delete) %>
+            <li role="presentation" action="<%= Migration.actions[:delete] %>">
+              <span role="menuitem" tabindex="-1" class="disabled">delete</span></li>
+          <% end %>
+          <% if @available_actions.include?(:cancel) %>
+            <li role="presentation" action="<%= Migration.actions[:cancel] %>">
+              <span role="menuitem" tabindex="-1" class="disabled">cancel</span></li>
+          <% end %>
+        <% end %>
+
+        </ul>
+      </li>
+    </ul>
+
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>id</th>
+          <th>updated at</th>
+          <th>cluster</th>
+          <th>database</th>
+          <th>status</th>
+          <th><center><input type="checkbox" id="select_all"></center></th>
+        </tr>
+      <tbody>
+      <% @migrations.each do |m| %>
+        <tr>
+          <td><%= link_to m.id, m %></td>
+          <td><%= m[:updated_at] %></td>
+          <td><%= m[:cluster_name] %></td>
+          <td><%= m[:database] %></td>
+          <td>
+            <span class="label label-<%= @statuses[m.status].label %>" data-actions="<%= m.actions %>"
+              mig_id="<%= m.id %>" lock_version="<%= m.lock_version %>">
+              <%= @statuses[m.status].description %></span>
+          </td>
+          <td><center><input class="migration-checkbox" type="checkbox"></center></td>
+        </tr>
+      <% end %>
+      </tbody>
+    </table>
+  </div>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='text/html; charset=UTF-8' http-equiv='Content-Type' />
+  </head>
+  <body>
+    <h2>New OSC Request:
+      <% if Rails.env == 'production' %>
+        <span style="background-color: #5bc0de; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= Rails.env %></span>
+      <% else %>
+        <span style="background-color: #5cb85c; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= Rails.env %></span>
+      <% end %>
+    </h2>
+    <hr>
+
+    <table>
+      <col width="100">
+      <col width="800">
+      <tr>
+        <td><strong>id<strong></td>
+        <td><%= link_to 'osc-' + @migration.id.to_s, migration_url(@migration, :protocol => 'https'), {:style => 'color: #2996cc; text-decoration: none;'} %></td>
+      </tr>
+      <tr>
+        <td><strong>requestor<strong></td>
+        <td><%= @migration.requestor %></td>
+      </tr>
+      <tr>
+        <td><strong>cluster<strong></td>
+        <td><%= @migration.cluster_name %></td>
+      </tr>
+      <tr>
+        <td><strong>database<strong></td>
+        <td><%= @migration.database %></td>
+      </tr>
+      <tr>
+        <td><strong>table<strong></td>
+        <td><%= @migration.parsed[:table] %></td>
+      </tr>
+      <tr>
+        <td><strong>ddl statement<strong></td>
+        <td><%= @migration.ddl_statement %></td>
+      </tr>
+    </table>
+  </body>
+</html>

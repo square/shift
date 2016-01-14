@@ -1,0 +1,31 @@
+{
+	"ImportPath": "github.com/square/shift/runner",
+	"GoVersion": "go1.6",
+	"Packages": [
+		"./..."
+	],
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/goconf/conf",
+			"Comment": "null-17",
+			"Rev": "'a4db5c465ed1c5d7a1ca805593ac77c067920722'"
+		},
+		{
+			"ImportPath": "github.com/codahale/tmpmysqld",
+			"Rev": "64dcbcba51d368e812d485980832e98124e471e9"
+		},
+		{
+			"ImportPath": "github.com/go-sql-driver/mysql",
+			"Comment": "v1.2-1-g7094cf0",
+			"Rev": "7094cf0331ed6bde3cd75aa5d1da0e7764b526c9"
+		},
+		{
+			"ImportPath": "github.com/golang/glog",
+			"Rev": "d1c4472bf2efd3826f2b5bdcc02d8416798d678c"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "eca94c41d994ae2215d455ce578ae6e2dc6ee516"
+		}
+	]
+}

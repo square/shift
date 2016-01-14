@@ -1,0 +1,46 @@
+<div id="filter_header">
+  <div id="toggle_filter">
+    <% if @requestor.nil? & @cluster_name.nil? & @ddl_statement.nil? %>show filters<% else %>hide filters<% end %></div>
+  <div style="clear: both;"></div>
+
+  <div id="filters" <% if @requestor.nil? & @cluster_name.nil? & @ddl_statement.nil? %>hidden<% end %>>
+    <div class="row">
+      <div class="col-md-3 col-md-offset-1">
+        <div class="filter-title">cluster</div>
+        <select id='cluster_filter' class='select-search' data-width="100%">
+          <option></option>
+          <% @cluster_names.each do |cluster| %>
+            <% if cluster == @cluster_name %>
+              <option selected><%= @cluster_name %></option>
+            <% else %>
+              <option><%= cluster %></option>
+            <% end %>
+          <% end %>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <div class="filter-title">requestor</div>
+        <select id='requestor_filter' class='select-search' data-width="100%">
+          <option></option>
+          <% @requestors.each do |requestor| %>
+            <% if requestor == @requestor %>
+              <option selected><%= @requestor %></option>
+            <% else %>
+              <option><%= requestor %></option>
+            <% end %>
+          <% end %>
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <div class="filter-title">ddl statement</div>
+        <input id='ddl_statement_filter' class="form-control" type="text" value="<%= @ddl_statement %>">
+      </div>
+
+      <div class="col-md-1">
+        <input type="submit" id="apply_filter" value="Apply" class="btn btn-primary btn-xs">
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,13 @@
+<h2>Status:
+<% if @status.label == "info" %>
+  <span style="background-color: #5bc0de; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= @status.description %></span>
+<% elsif @status.label == "warning" %>
+  <span style="background-color: #f0ad4e; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= @status.description %></span>
+<% elsif @status.label == "success" %>
+  <span style="background-color: #5cb85c; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= @status.description %></span>
+<% elsif @status.label == "danger" %>
+  <span style="background-color: #d9534f; font-size: 75%; margin-left: 12px; padding: .2em .6em .3em; color: #fff; border-radius: .25em;"><%= @status.description %></span>
+<% end %>
+</h2>
+
+<h4>copy percentage: <%= @migration.copy_percentage.nil? ? 0 : @migration.copy_percentage %>%</h4>

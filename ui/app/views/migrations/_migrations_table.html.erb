@@ -1,0 +1,47 @@
+  <div class="migration-section">
+    <% unless @limit %>
+      <div class="back-link"><%= link_to '< Back to All Migrations', root_url + "?" +
+        ("&cluster=#{@cluster_name}" if @cluster_name).to_s + ("&requestor=#{@requestor}" if @requestor).to_s +
+        ("&ddl_statement=#{URI.escape(@ddl_statement)}" if @ddl_statement).to_s%></div>
+    <% end %>
+    <h3><%= title %> <span class="count">(<%= count %>)</span></h3>
+    <table class="table table-hover">
+      <thead>
+        <tr>
+        <% columns.each do |field| %>
+          <th><%= field.gsub(/_/, ' ') %></th>
+        <% end %>
+        </tr>
+      <tbody>
+      <% migrations.each do |migration| %>
+        <tr>
+        <% columns.each do |field| %>
+          <% if field == "copy_percentage" %>
+            <td>
+              <div id="progressBar<%= migration.id %>" class="progressBar" data-value="<%= migration.copy_percentage %>"><div></div></div>
+            </td>
+          <% elsif field == "id" %>
+            <td><%= link_to migration.id, migration %></td>
+          <% elsif field == "status" %>
+            <td>
+              <span class="label label-<%= @statuses[migration.status].label %>"><%= @statuses[migration.status].description %></span>
+            </td>
+          <% elsif field == "ddl_statement" %>
+            <td class="wrap-text"><%= breaking_word_wrap(migration[field], line_width: 60) %></td>
+          <% else %>
+            <td><%= migration[field] %></td>
+          <% end %>
+        <% end %>
+        </tr>
+      <% end %>
+      </tbody>
+    </table>
+    <% if count > 5 && @limit %>
+      <div class="expand"><%= link_to 'See all', migrations_url + "?state=#{link}" +
+      ("&cluster=#{@cluster_name}" if @cluster_name).to_s + ("&requestor=#{@requestor}" if @requestor).to_s +
+      ("&ddl_statement=#{URI.escape(@ddl_statement)}" if @ddl_statement).to_s%></div>
+    <% end %>
+    <% if count > 20 && !@limit %>
+        <%= paginate migrations, :theme => 'twitter-bootstrap-3', :pagination_class => "pagination-sm" %>
+    <% end %>
+  </div>

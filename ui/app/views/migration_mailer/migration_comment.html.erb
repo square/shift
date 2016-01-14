@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta content='text/html; charset=UTF-8' http-equiv='Content-Type' />
+  </head>
+  <body>
+    <div><%= link_to 'osc-' + @migration.id.to_s, migration_url(@migration, :protocol => 'https'), {:style => 'color: #2996cc; text-decoration: none;'} %></div>
+    <h2>New Comment:</h2>
+    <hr>
+
+    <table style="padding-top: 10px;">
+      <tr>
+        <td style="padding-right: 50px; width: 15%">
+          <center><img style="border-radius: 4px; border: 1px solid #d9dbdc;" src="<%= @person[:photo] %>" height="50" width="50"></center>
+          <div style="text-align: center;"><span style="color: #2996cc"><%= @comment.author %>@</span></div>
+        </td>
+        <td style="text-align: left; vertical-align: middle; padding-right: 50px; width: 15%">
+          <div><i><%= @comment.created_at.to_time.strftime('%m/%d/%Y') %></i></div>
+          <div><i><%= @comment.created_at.to_time.strftime('%l:%M %p') %></i></div>
+        </td>
+        <td style="text-align: left; margin-left: 10px; vertical-align: middle; width: 70%">
+          <%= @comment.comment %>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

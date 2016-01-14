@@ -1,0 +1,27 @@
+  <div class="migration-section">
+    <h3>Meta Requests<span class="count">(<%= @count %>)</span></h3>
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>id</th>
+          <th class="created-at-column">created at</th>
+          <th>requestor</th>
+          <th>mig count</th>
+          <th>ddl statement</th>
+        </tr>
+      <tbody>
+      <% @meta_requests.each do |mr| %>
+        <tr>
+          <td><%= link_to mr.id, mr %></td>
+          <td><%= mr[:created_at] %></td>
+          <td><%= mr[:requestor] %></td>
+          <td><%= mr.migrations.length %></td>
+          <td class="wrap-text"><%= breaking_word_wrap(mr[:ddl_statement], line_width: 60) %></td>
+        </tr>
+      <% end %>
+      </tbody>
+    </table>
+    <% if @count > 20 %>
+        <%= paginate @meta_requests, :theme => 'twitter-bootstrap-3', :pagination_class => "pagination-sm" %>
+    <% end %>
+  </div>

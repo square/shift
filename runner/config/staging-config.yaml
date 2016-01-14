@@ -1,0 +1,22 @@
+# config for the database client
+mysql_user:
+mysql_password:
+mysql_cert:
+mysql_key:
+mysql_rootCA:
+mysql_defaults_file: config/my_staging.cnf
+
+# config for the rest client
+rest_api:
+rest_cert:
+rest_key:
+
+# general config
+log_dir: /tmp/shift/
+pt_osc_path: pt-online-schema-change
+pending_drops_db: _pending_drops
+
+# optionally override the host/port/db to run an OSC on
+host_override:
+port_override:
+database_override:

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>shift</title>
+    <%= stylesheet_link_tag    :application, media: :all %>
+    <%= javascript_include_tag :application %>
+    <%= csrf_meta_tags %>
+    <%= favicon_link_tag %>
+  </head>
+  <body>
+    <div id="wrap">
+      <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+        <div class="container">
+          <div>
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+              <%= link_to 'shift', root_url, class: 'navbar-brand' %>
+            </div>
+            <div class="collapse navbar-collapse">
+              <p class="navbar-text navbar-right">
+              <%= current_user_name %></p>
+              <ul class="nav navbar-nav navbar-right">
+                <li class="<%= 'active' if params[:action] == "index" && params[:controller] == "migrations" %>"><%= link_to 'All Requests', root_url %></li>
+                <li class="<%= 'active' if params[:action] == "index" && params[:controller] == "meta_requests" %>"><%= link_to 'Meta Requests', meta_requests_path %></li>
+                <li class="<%= 'active' if params[:action] == "new" %>"><%= link_to 'Create Request', new_migration_path %></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <div>
+        <% unless Rails.env == 'production' %>
+          <div class="alert alert-danger">
+            <strong>Warning:</strong> <%= Rails.env.capitalize %> environment.
+          </div>
+        <% end %>
+
+          <%= yield %>
+        </div>
+      </div>
+    </div>
+    <footer>
+      <div class="container">
+        <center>
+          <p class="text-muted">&copy; <%= Time.now.year %> Shift</p>
+        </center>
+      </div>
+    </footer>
+  </body>
+</html>

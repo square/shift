@@ -1,0 +1,148 @@
+<h2><%= !!@meta_request ? "Edit" : "New" %> Meta Request</h2>
+
+<div class="col-md-10 col-md-offset-1"><span class="help-block">
+  A meta request is a collection of migrations that share a common ddl
+  statement and final insert. You can apply a meta request to multiple cluster/database
+  combinations, which makes them ideal for sharded setups.
+  Once you click "Submit", every migration you attemp to create will be validated.
+  If there are any errors, the meta request won't be created and the errors will be
+  shown on this page. If there are no errors, you will be redirected to your
+  meta request and the list of migrations in it.
+
+  <% if !!@meta_request %>
+    <br/>
+    <br/>
+    * EDITING NOTE: you can only edit a meta request if each individual migration that
+    belongs to it can also be updated. When you click submit, we validate/update all of the
+    individual migrations and roll everything back if there are any errors.
+  <% end %>
+</span></div>
+
+<div class="col-md-10 col-md-offset-1" id="form-table">
+  <form class="form-horizontal submit-meta-request-form" role="form" action="<%= formurl %>" method="post">
+
+    <% if !!@meta_request %>
+      <input type="hidden" name="_method" value="patch" />
+    <% end %>
+
+    <% if @errors || (@meta_request && @meta_request.errors.any?) %>
+      <div class="alert alert-danger">
+        <strong>Request is not complete!</strong>
+        <% if @meta_request && @meta_request.errors.any? %>
+          <ul>
+          <% @meta_request.errors.full_messages.each do |error| %>
+            <li><%= error %></li>
+          <% end %>
+          </ul>
+        <% end %>
+
+        <ul>
+        <% @errors.each do |error| %>
+          <li>cluster: <%= error.cluster_name %>, database: <%= error.database %></li>
+          <ul>
+          <% error.errors.full_messages.each do |err| %>
+            <li><%= err %></li>
+          <% end %>
+          </ul>
+        <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="form-group">
+      <label for="ddl_statement" class="col-md-3 control-label">DDL statement</label>
+      <div class="col-md-7">
+        <textarea id="ddl_statement" class="form-control" name="ddl_statement" rows="3"><%= @saved_state[:ddl_statement] %></textarea>
+        <span class="help-block">This is what online-schema-change will actually run.
+          Query must be a single DDL statement. References:
+          <div class="tab">
+            <table>
+              <tr>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/create-table.html">create table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/create-view.html">create view</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/alter-table.html">alter table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/drop-table.html">drop table</a></td>
+                <td class="reference-cell"><a href="http://dev.mysql.com/doc/refman/5.5/en/drop-view.html">drop view</a></td>
+              </tr>
+            </table>
+          </div>
+        </span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="pr_url" class="col-md-3 control-label">pr url</label>
+      <div class="col-md-7">
+        <input id="pr_url" type="text" class="form-control" name="pr_url" value="<%= @saved_state[:pr_url] %>">
+        <span class="help-block">The link to the PR url.</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="final_insert" class="col-md-3 control-label">final insert</label>
+      <div class="col-md-7">
+        <textarea id="final_insert" class="form-control" name="final_insert"><%= @saved_state[:final_insert] %></textarea>
+        <span class="help-block">Optional. An insert to run at the end of your migration (ex: insert into schema_migrations).
+          Must begin with 'INSERT INTO ', and cannot contain a ';' (semicolon).</span>
+      </div>
+    </div>
+
+    <% if !@meta_request %>
+      <div class="form-group">
+        <div class="col-md-6" id="cluster_select_section">
+          <center><label for="clusters" class="control-label centered-label">clusters</label></center>
+          <select id='clusters_selector' class='chosen-select form-control' name="clusters[]" data-width="100%" multiple="multiple">
+            <option></option>
+            <optgroup label = "staging">
+            <% Form::MigrationRequest.all_clusters.each do |cluster| %>
+              <% next unless cluster.is_staging? %>
+              <% if @saved_state[:cluster_dbs].keys.include?(cluster.name) %>
+                <option selected><%= cluster.name %></option>
+              <% else %>
+                <option><%= cluster.name %></option>
+              <% end %>
+            <% end %>
+            </optgroup>
+            <optgroup label = "production">
+            <% Form::MigrationRequest.all_clusters.each do |cluster| %>
+              <% next if cluster.is_staging? %>
+              <% if @saved_state[:cluster_dbs].keys.include?(cluster.name) %>
+                <option selected><%= cluster.name %></option>
+              <% else %>
+                <option><%= cluster.name %></option>
+              <% end %>
+            <% end %>
+            </optgroup>
+          </select>
+          <span class="help-block">Selecting a cluster will populate the "databases" table to the right. You can select multiple clusters.</span>
+        </div>
+
+        <div class="col-md-5 col-md-offset-1">
+          <center><label for="databases" class="control-label centered-label">databases</label></center>
+          <div id="db_select_section">
+            <select id='databases_selector' class='form-control' data-height="90%" name="databases[]" data-width="100%" multiple="multiple">
+              <% @saved_state[:cluster_dbs].each do |cluster, saved_databases| %>
+                <optgroup label="<%= cluster %>" cluster="<%= cluster %>" class="db-optgroup">
+                <% MysqlHelper.safe_databases(cluster).each do |database| %>
+                  <% if saved_databases.include?(database) %>
+                    <option value="<%= cluster %>:<%= database %>" class="db-option" selected><%= database %></option>
+                  <% else %>
+                    <option value="<%= cluster %>:<%= database %>" class="db-option"><%= database %></option>
+                  <% end %>
+                <% end %>
+              <% end %>
+            </select>
+          </div>
+          <span class="help-block">The databases your migration will be run on. You can select multiple databases for multiple clusters.</span>
+        </div>
+      </div>
+    <% end %>
+
+    <%= tag(:input, :type => "hidden", :name => request_forgery_protection_token.to_s, :value => form_authenticity_token) %>
+
+    <div class="form-group">
+      <center><button id="meta_request_submit" type="submit" class="btn btn-primary"><%= submit_text %></button></center>
+    </div>
+
+  </form>
+</div>
