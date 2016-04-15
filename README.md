@@ -23,6 +23,9 @@ shift consists of 3 components. Each component has its own readme with more deta
 ## Demo
 Watch a demo video [here](https://www.youtube.com/watch?v=u5L7PqIk--k)
 
+## Installation
+Read the installation guide [here](https://github.com/square/shift/wiki/Installation-Guide)
+
 ## License
 
 Copyright (c) 2016 Square Inc. Distributed under the Apache 2.0 License.
