@@ -30,6 +30,15 @@ class ApplicationController < ActionController::Base
     return render text: "You are not authorized to perform this action.", status: :unauthorized
   end
 
+  def user_is_admin?
+    (current_user[:capabilities].include? 'admin') || Rails.env.development?
+  end
+  helper_method :user_is_admin?
+
+  def require_admin
+    render :template => "errors/error401", :status => 401 unless user_is_admin?
+  end
+
   # extend rails' word_wrap to break up long words. this helps us in our views when someone submits
   # a ddl statement with a super long word in it
   def breaking_word_wrap(text, *args)

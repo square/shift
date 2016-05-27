@@ -1,0 +1,57 @@
+<div class="row">
+  <div class="col-md-6">
+    <h3 class="text-center chart-heading">Created vs. Filed</h3>
+    <div id="filed_completed_chart"></div>
+    <div class="col-md-4 col-md-offset-4">
+      <select id="filed_completed_chart_control" class="select-menu form-control">
+        <option value="1">1 week</option>
+        <option value="4" selected="selected">1 month</option>
+        <option value="26">6 months</option>
+        <option value="52">1 year</option>
+        <option value="0">all time</option>
+      </select>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <h3 class="text-center chart-heading">Average Approval Times</h3>
+    <div id="approval_time_chart"></div>
+    <div class="col-md-4 col-md-offset-4">
+      <select id="approval_time_chart_control" class="select-menu form-control">
+        <option value="1">1 week</option>
+        <option value="4" selected="selected">1 month</option>
+        <option value="26">6 months</option>
+        <option value="52">1 year</option>
+        <option value="0">all time</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div id="cluster_metrics" class="row">
+  <h3 class="text-center">Cluster Metrics</h3>
+  <div id="cluster_filter" class="col-md-4 col-md-offset-4">
+    <select id="cluster_filter_dropdown" class="select-search col-md-12">
+      <option></option>
+      <% @cluster_names.each do |cluster| %>
+        <option><%= cluster %>
+      <% end %>
+    </select>
+  </div>
+
+  <div class = "col-md-12">
+    <table id="cluster_metrics_table" class="table table-hover">
+      <thead>
+        <tr>
+          <th>database</th>
+          <th>table</th>
+          <th># times altered</th>
+          <th>avg alter time</th>
+          <th>max alter time</th>
+          <th>min alter time</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="spinner_target"></div>
+  </div>
+</div>

@@ -1,0 +1,21 @@
+/*
+  Place all the styles related to the matching controller here.
+  They will automatically be included in application.css.
+*/
+
+#cluster_metrics {
+	padding-top: 65px;
+}
+
+#cluster_filter {
+	padding-top: 10px;
+	padding-bottom: 20px;
+}
+
+.chart-heading {
+	padding-bottom: 20px;
+}
+
+#spinner_target {
+  height: 100px;
+}

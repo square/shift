@@ -31,6 +31,15 @@ Rails.application.routes.draw do
 
   resources :comments, :only => [:create, :destroy]
 
+  resources :admin, :only => [:index]
+  resources :admin do
+    collection do
+      get 'refresh_filed_chart'
+      get 'refresh_approval_time_chart'
+      get 'refresh_cluster_metrics'
+    end
+  end
+
   # TODO: set default path (or remove it, this is only here because acceptance specs
   # require a root)
   root to: 'migrations#index'
@@ -53,4 +62,5 @@ Rails.application.routes.draw do
   end
 
   match "/404" => "errors#error404", via: [ :get, :post, :patch, :delete ]
+  match "/401" => "errors#error401", via: [ :get, :post, :patch, :delete ]
 end
