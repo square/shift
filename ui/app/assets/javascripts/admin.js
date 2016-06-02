@@ -113,7 +113,8 @@ function updateApprovalTimeChart(weeks) {
 }
 
 function updateMetrics(cluster) {
-    $("#cluster_metrics_table").find("tbody").empty()
+    $("#cluster_metrics_table").find("tbody").empty();
+    $("#cluster_metrics_error").remove();
     spinner.spin($("#spinner_target")[0])
     $.ajax({
         method: "GET",
@@ -146,6 +147,10 @@ function updateMetrics(cluster) {
             spinner.stop();
         },
         error: function(data) {
+            $("#cluster_metrics_table").after($("<p>")
+                .text("Error loading data")
+                .addClass("text-center")
+                .attr("id", "cluster_metrics_error"));
             spinner.stop();
         }
     })

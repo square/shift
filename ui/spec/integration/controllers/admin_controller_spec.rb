@@ -3,8 +3,8 @@ require 'integration_helper'
 RSpec.describe AdminController, type: :controller do
 
   before (:each) do
-    allow(Time).to receive(:now).and_return(Time.now)
-    allow(Date).to receive(:today).and_return(Date.today)
+    allow(Time).to receive(:now).and_return(Time.new(2015, 6, 1, 2, 2, 2))
+    allow(Date).to receive(:today).and_return(Date.new(2015, 6, 1))
     login(admin: true)
   end
 

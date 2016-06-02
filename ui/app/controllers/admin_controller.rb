@@ -143,6 +143,8 @@ class AdminController < ApplicationController
     render json: migrations
   end
 
+  private
+  
   def keys_by_month(number_months)
     number_months.times.map {|x| (number_months.months.ago + (x + 1).months).strftime("%Y-%m")}
   end
