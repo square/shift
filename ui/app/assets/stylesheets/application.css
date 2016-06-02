@@ -64,7 +64,7 @@ footer .text-muted {
   background-color: #6f5499;
 }
 
-#not_found {
+#error_message {
   text-align: center;
   margin-top: 150px;
 }

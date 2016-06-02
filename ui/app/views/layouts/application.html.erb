@@ -26,6 +26,9 @@
               <p class="navbar-text navbar-right">
               <%= current_user_name %></p>
               <ul class="nav navbar-nav navbar-right">
+                <% if user_is_admin? %>
+                <li class="<%= 'active' if params[:action] == "index" && params[:controller] == "admin" %>"><%= link_to 'Admin Panel', admin_index_path %></li>
+                <% end %>
                 <li class="<%= 'active' if params[:action] == "index" && params[:controller] == "migrations" %>"><%= link_to 'All Requests', root_url %></li>
                 <li class="<%= 'active' if params[:action] == "index" && params[:controller] == "meta_requests" %>"><%= link_to 'Meta Requests', meta_requests_path %></li>
                 <li class="<%= 'active' if params[:action] == "new" %>"><%= link_to 'Create Request', new_migration_path %></li>

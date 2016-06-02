@@ -77,6 +77,8 @@ GEM
       thor (~> 0.19.1)
     globalid (0.3.6)
       activesupport (>= 4.1.0)
+    highcharts-rails (4.2.5)
+      railties (>= 3.1)
     i18n (0.7.0)
     imgkit (1.6.1)
     jquery-rails (4.1.0)
@@ -233,6 +235,7 @@ DEPENDENCIES
   factory_girl_rails
   fdoc
   foreman
+  highcharts-rails
   imgkit
   jquery-rails
   json

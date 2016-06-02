@@ -9,6 +9,7 @@ gem 'mysql2'
 gem 'twitter-bootstrap-rails'
 # Use jquery as the JavaScript library
 gem 'jquery-rails'
+gem "highcharts-rails"
 # bundle exec rake doc:rails generates the API under doc/api.
 gem 'sdoc', '~> 0.4.0', group: :doc
 
