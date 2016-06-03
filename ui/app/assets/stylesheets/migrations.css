@@ -204,3 +204,23 @@
   padding:4px;
   border-radius: 5px;
 }
+
+.popover {
+  max-width: 380px;
+  width: 380px;
+  z-index: 1;
+}
+
+#table_stats {
+  cursor: default;
+}
+
+#table_stats_icon {
+  margin-left: 8px;
+}
+
+#table_stats_new {
+  font-size: 10px;
+  font-weight: bold;
+  color: #f19834;
+}
