@@ -47,13 +47,35 @@ class MigrationsController < ApplicationController
     comment_authors.uniq.each do |a|
       @profile[a] = {:photo => profile_client.primary_photo(a)}
     end
+
+    begin
+      table = OscParser.new.parse(@migration.ddl_statement)[:table]
+    rescue # skip unparsable statements
+    end
+
+    @last_alter_date, @last_alter_duration, @average_alter_duration = get_table_stats(
+      @migration.cluster_name,
+      @migration.database,
+      table)
+
+
   end
 
   def refresh_detail
     @migration = Migration.find(params[:id])
     @status = Statuses.find_by_status!(@migration.status)
+    begin
+      table = OscParser.new.parse(@migration.ddl_statement)[:table]
+    rescue # skip unparsable statements
+    end
+    @last_alter_date, @last_alter_duration, @average_alter_duration = get_table_stats(
+      @migration.cluster_name,
+      @migration.database,
+      table)
     render :json => {:detailPartial => render_to_string('migrations/_detail', :layout => false,
-                                                         :locals => { :migration => @migration, :status => @status }),
+                                                         :locals => { :migration => @migration, :status => @status}),
+                     :last_alter_date => @last_alter_date,:last_alter_duration => @last_alter_duration,
+                     :average_alter_duration => @average_alter_duration,
                      :copy_percentage => @migration.copy_percentage, :status => @migration.status}
   end
 
@@ -229,6 +251,44 @@ class MigrationsController < ApplicationController
   end
 
   private
+
+  def get_table_stats(cluster_name, database, table)
+    return "N/A", "N/A", "N/A" if !cluster_name || !database || !table
+
+    last_alter_date = nil
+    last_alter_duration = nil
+    average_alter_duration = nil
+    times_altered = 0
+
+    Migration.where("cluster_name = ? AND `database` = ? AND started_at IS NOT NULL AND completed_at IS NOT NULL",
+      cluster_name, database).order("started_at").each do |migration|
+      begin
+        migration_table = OscParser.new.parse(migration.ddl_statement)[:table]
+      rescue
+        next # skip unparsable statements
+      end
+
+      next if table != migration_table
+
+      alter_duration = migration.completed_at - migration.started_at
+
+      last_alter_date = migration.started_at.to_s.split[0] if !last_alter_date
+      last_alter_duration = alter_duration if !last_alter_duration
+      times_altered += 1
+      if average_alter_duration
+        average_alter_duration = (average_alter_duration * (times_altered - 1) + alter_duration) / times_altered
+      else
+        average_alter_duration = alter_duration
+      end
+
+    end
+
+    return "N/A", "N/A", "N/A" if times_altered == 0
+
+    return Date.strptime(last_alter_date, ("%Y-%m-%d")).strftime("%m/%d/%Y"),
+      Time.at(last_alter_duration).utc.strftime("%H:%M:%S"),
+      Time.at(average_alter_duration).utc.strftime("%H:%M:%S")
+  end
 
   def send_notifications
     Notifier.notify("migration id #{@migration.id} moved to status #{@migration.status} from the UI by #{current_user_name}")

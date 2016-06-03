@@ -69,6 +69,26 @@ function postComment(author, comment, migration_id) {
     });
 }
 
+var popoverActive = false;
+function makeStatsPopover() {
+    $("#table_stats").popover({
+        animation: false,
+        html: true,
+        title: "Table Stats",
+        trigger: "hover"
+    });
+    $("#table_stats").on("show.bs.popover", function() {
+        popoverActive = true;
+    });
+    $("#table_stats").on("hide.bs.popover", function() {
+        popoverActive = false;
+    });
+    if (popoverActive) {
+        $("#table_stats").popover("show");
+    }
+
+}
+
 $(document).ready(function() {
     setProgress();
     $("[id$=_migration_request_cluster_name]").change(function(event){
@@ -143,8 +163,9 @@ $(document).ready(function() {
             var migrationId = $("#migration-id").html();
 
             // stop refreshing when the migration is either done or canceled
-            if ((previousStatus === "8") || (previousStatus === "9")) {
+            if ((previousStatus === 8) || (previousStatus === 9)) {
                 clearInterval(interval);
+                return;
             }
 
             $.ajax({
@@ -162,6 +183,7 @@ $(document).ready(function() {
                         var valor = Number(result["copy_percentage"]);
                         progress(valor, bar);
                     }
+                    makeStatsPopover();
                 },
                 error: function(data) {
                   if (data.status == 404) {
@@ -172,4 +194,6 @@ $(document).ready(function() {
             });
         }, 15000);
     };
+
+    makeStatsPopover();
 })
