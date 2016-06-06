@@ -1,5 +1,5 @@
---- pt-online-schema-change       2016-04-13 16:45:54.000000000 -0700
-+++ pt-online-schema-change       2016-04-13 16:45:54.000000000 -0700
+--- pt-online-schema-change       2016-06-06 11:16:54.000000000 -0700
++++ pt-online-schema-change       2016-06-06 11:16:54.000000000 -0700
 @@ -27,6 +27,7 @@
        TableNibbler
        TableParser
@@ -8,7 +8,7 @@
        Retry
        Cxn
        MasterSlave
-@@ -3623,6 +3624,93 @@
+@@ -3627,6 +3628,93 @@
  # ###########################################################################
  
  # ###########################################################################
@@ -102,7 +102,7 @@
  # Retry package
  # This package is a copy without comments from the original.  The original
  # with comments and its test file can be found in the Bazaar repository at,
-@@ -5244,7 +5332,7 @@
+@@ -5395,7 +5483,7 @@
  }
  
  sub next {
@@ -111,7 +111,7 @@
  
     if ( !$self->{oktonibble} ) {
        PTDEBUG && _d('Not ok to nibble');
-@@ -5259,7 +5347,7 @@
+@@ -5410,7 +5498,7 @@
  
     if ($self->{nibbleno} == 0) {
        $self->_prepare_sths();
@@ -120,7 +120,7 @@
        if ( my $callback = $self->{callbacks}->{init} ) {
           $self->{oktonibble} = $callback->(%callback_args);
           PTDEBUG && _d('init callback returned', $self->{oktonibble});
-@@ -5361,7 +5449,7 @@
+@@ -5512,7 +5600,7 @@
     die "I need a boundary parameter"
        unless $boundary;
     die "Invalid boundary: $boundary"
@@ -129,7 +129,7 @@
     die "I need a values arrayref parameter"
        unless $values && ref $values eq 'ARRAY';
     $self->{$boundary} = $values;
-@@ -5579,7 +5667,7 @@
+@@ -5730,7 +5818,7 @@
  }
  
  sub _get_bounds { 
@@ -138,7 +138,7 @@
  
     if ( $self->{one_nibble} ) {
        if ( $self->{resume} ) {
-@@ -5591,6 +5679,13 @@
+@@ -5742,6 +5830,13 @@
     my $dbh = $self->{Cxn}->dbh();
  
     $self->{first_lower} = $dbh->selectrow_arrayref($self->{first_lb_sql});
@@ -152,7 +152,7 @@
     PTDEBUG && _d('First lower boundary:', Dumper($self->{first_lower}));  
  
     if ( my $nibble = $self->{resume} ) {
-@@ -7780,16 +7875,57 @@
+@@ -7973,16 +8068,57 @@
     # on the command line via the DSN.
     my ($db, $tbl);
     my $dsn = shift @ARGV;
@@ -215,7 +215,7 @@
     my $alter_fk_method = $o->get('alter-foreign-keys-method') || '';
     if ( $alter_fk_method eq 'drop_swap' ) {
        $o->set('swap-tables',    0);
-@@ -8205,6 +8341,7 @@
+@@ -8446,6 +8582,7 @@
     };
  
     check_orig_table(
@@ -223,7 +223,7 @@
        orig_tbl     => $orig_tbl,
        Cxn          => $cxn,
        OptionParser => $o,
-@@ -8433,12 +8570,26 @@
+@@ -8679,12 +8816,26 @@
        );
     }
  
@@ -252,7 +252,7 @@
  
     # --plugin hook
    if ( $plugin && $plugin->can('before_create_new_table') ) {
-@@ -8451,6 +8602,7 @@
+@@ -8697,6 +8848,7 @@
     my $new_tbl;
     eval {
        $new_tbl = create_new_table(
@@ -260,7 +260,7 @@
           new_table_name   => $new_table_name,
           new_table_prefix => $new_table_prefix,
           orig_tbl         => $orig_tbl,
-@@ -8484,6 +8636,11 @@
+@@ -8730,6 +8882,11 @@
               . "the tool was interrupted.  To drop the new table, "
               . "execute:\n$sql\n";
        }
@@ -272,7 +272,7 @@
        elsif ( $orig_tbl->{copied} && !$orig_tbl->{swapped} ) {
           print "Not dropping the new table $new_tbl->{name} because "
               . "--swap-tables failed.  To drop the new table, "
-@@ -8571,7 +8728,10 @@
+@@ -8817,7 +8974,10 @@
        );
     }
  
@@ -284,7 +284,7 @@
        print "Altering new table...\n";
        my $sql = "ALTER TABLE $new_tbl->{name} $alter";
        print $sql, "\n" if $o->get('print');
-@@ -8690,6 +8850,16 @@
+@@ -8936,6 +9096,16 @@
        );
     }
  
@@ -301,7 +301,7 @@
     # ########################################################################
     # Step 3: Create the triggers to capture changes on the original table and
     # apply them to the new table.
-@@ -8722,6 +8892,11 @@
+@@ -8968,6 +9138,11 @@
           . "specified.  To drop the triggers, execute:\n"
           . join("\n", @drop_trigger_sqls) . "\n";
        }
@@ -313,7 +313,7 @@
        else {
           drop_triggers(
              tbl          => $orig_tbl,
-@@ -8742,6 +8917,7 @@
+@@ -8988,6 +9163,7 @@
  
     my @trigger_names = eval {
        create_triggers(
@@ -321,7 +321,7 @@
           orig_tbl     => $orig_tbl,
           new_tbl      => $new_tbl,
           del_tbl      => $del_tbl,
-@@ -8763,6 +8939,16 @@
+@@ -9009,6 +9185,16 @@
        $plugin->after_create_triggers();
     }
  
@@ -338,7 +338,7 @@
     # #####################################################################
     # Step 4: Copy rows.
     # #####################################################################
-@@ -8776,6 +8962,7 @@
+@@ -9022,6 +9208,7 @@
     my $avg_rate   = 0;  # rows/second
     my $limit      = $o->get('chunk-size-limit');  # brevity
     my $chunk_time = $o->get('chunk-time');        # brevity
@@ -346,7 +346,7 @@
  
     my $callbacks = {
        init => sub {
-@@ -9005,6 +9192,32 @@
+@@ -9254,6 +9441,32 @@
              }
           }
  
@@ -379,7 +379,7 @@
           # Wait forever for slaves to catch up.
           $replica_lag_pr->start() if $replica_lag_pr;
           $replica_lag->wait(Progress => $replica_lag_pr);
-@@ -9042,6 +9255,9 @@
+@@ -9301,6 +9514,9 @@
        tbl                => $orig_tbl,
        chunk_size         => $orig_tbl->{chunk_size},
        chunk_index        => $o->get('chunk-index'),
@@ -389,7 +389,7 @@
        n_chunk_index_cols => $o->get('chunk-index-columns'),
        dml                => $dml,
        select             => $select,
-@@ -9067,8 +9283,15 @@
+@@ -9326,8 +9542,15 @@
          && !$nibble_iter->one_nibble()
          &&  $nibble_iter->row_estimate() )
     {
@@ -406,7 +406,7 @@
           spec    => $o->get('progress'),
           name    => "Copying $orig_tbl->{name}",
        );
-@@ -9082,7 +9305,9 @@
+@@ -9341,7 +9564,9 @@
     # Start copying rows.  This may take awhile, but --progress is on
     # by default so there will be progress updates to stderr.
     eval {
@@ -417,7 +417,7 @@
     };
     if ( $EVAL_ERROR ) {
        die ts("Error copying rows from $orig_tbl->{name} to "
-@@ -9124,6 +9349,42 @@
+@@ -9383,6 +9608,42 @@
        $plugin->after_copy_rows();
     }
  
@@ -460,7 +460,7 @@
     # #####################################################################
     # XXX
     # Step 5: Rename tables: orig -> old, new -> orig
-@@ -9234,14 +9495,27 @@
+@@ -9493,14 +9754,27 @@
        }
     }
  
@@ -489,7 +489,7 @@
           print "Not dropping old table because --no-swap-tables was specified.\n";
        }
        else {
-@@ -9262,7 +9536,13 @@
+@@ -9521,7 +9795,13 @@
              $cxn->dbh()->do($sql);
           }
  
@@ -504,7 +504,7 @@
           print $sql, "\n" if $o->get('print');
           PTDEBUG && _d($sql); 
           eval {
-@@ -9271,7 +9551,12 @@
+@@ -9530,7 +9810,12 @@
           if ( $EVAL_ERROR ) {
              die ts("Error dropping the old table: $EVAL_ERROR\n");
           }
@@ -518,7 +518,7 @@
  
           # --plugin hook
           if ( $plugin && $plugin->can('after_drop_old_table') ) {
-@@ -9571,6 +9856,7 @@
+@@ -9834,6 +10119,7 @@
     }
     my ($new_table_name, $orig_tbl, $cxn, $q, $o, $tp) = @args{@required_args};
     my $new_table_prefix = $args{new_table_prefix};
@@ -526,7 +526,7 @@
  
     # Get the original table struct.
     my $ddl = $tp->get_create_table(
-@@ -9585,6 +9871,17 @@
+@@ -9848,6 +10134,17 @@
     my $tries = $new_table_prefix ? 10 : 1;
     my $tryno = 1;
     my @old_tables;
@@ -544,24 +544,24 @@
     while ( $tryno++ <= $tries ) {
        if ( $new_table_prefix ) {
           $new_table_name = $new_table_prefix . $new_table_name;
-@@ -9679,6 +9976,16 @@
-    elsif ( $o->get('execute') ) {
-       print ts("Swapping tables...\n");
+@@ -9937,6 +10234,16 @@
+    my $name_tries   = 10;  # don't try forever
+    my $table_exists = qr/table.+?already exists/i;
  
-+      if ( $o->get('swap-table-name') ) {
-+         $table_name = $o->get('swap-table-name');
-+         $table_name =~  s/%T/$orig_tbl->{name}/g;
-+         use POSIX 'strftime';
-+         my $timestamp = strftime("%Y%m%d%H%M%S", localtime(time()));
-+         $table_name =~  s/%D/$timestamp/g;
-+      } else {
-+         $table_name = $prefix . $table_name;
-+      }
++   if ( $o->get('swap-table-name') ) {
++      $table_name = $o->get('swap-table-name');
++      $table_name =~  s/%T/$orig_tbl->{name}/g;
++      use POSIX 'strftime';
++      my $timestamp = strftime("%Y%m%d%H%M%S", localtime(time()));
++      $table_name =~  s/%D/$timestamp/g;
++   } else {
++      $table_name = $prefix . $table_name;
++   }
 +
-       while ( $name_tries-- ) {
-          $table_name = $prefix . $table_name;
- 
-@@ -9715,6 +10022,7 @@
+    # This sub only works for --execute.  Since the options are
+    # mutually exclusive and we return in the if case, the elsif
+    # is just a paranoid check because swapping the tables is one
+@@ -9988,6 +10295,7 @@
           if ( my $e = $EVAL_ERROR ) {
              if ( $e =~ $table_exists ) {
                 PTDEBUG && _d($e);
@@ -569,7 +569,7 @@
                 next;
              }
              die ts($e);
-@@ -9738,6 +10046,28 @@
+@@ -10011,6 +10319,28 @@
     }
  }
  
@@ -598,7 +598,7 @@
  sub check_orig_table {
     my ( %args ) = @_;
     my @required_args = qw(orig_tbl Cxn TableParser OptionParser Quoter);
-@@ -9745,6 +10075,7 @@
+@@ -10018,6 +10348,7 @@
        die "I need a $arg argument" unless $args{$arg};
     }
     my ($orig_tbl, $cxn, $tp, $o, $q) = @args{@required_args};
@@ -606,7 +606,7 @@
  
     my $dbh = $cxn->dbh();
  
-@@ -9758,7 +10089,10 @@
+@@ -10031,7 +10362,10 @@
             . ' LIKE ' . $q->literal_like($orig_tbl->{tbl});
     PTDEBUG && _d($sql);
     my $triggers = $dbh->selectall_arrayref($sql);
@@ -618,7 +618,7 @@
        die "The table $orig_tbl->{name} has triggers.  This tool "
           . "needs to create its own triggers, so the table cannot "
           . "already have triggers.\n";
-@@ -10035,6 +10369,7 @@
+@@ -10330,6 +10664,7 @@
        die "I need a $arg argument" unless $args{$arg};
     }
     my ($orig_tbl, $new_tbl, $del_tbl, $cols, $cxn, $q, $o, $retry, $tries, $stats) = @args{@required_args};
@@ -626,7 +626,7 @@
  
     # This sub works for --dry-run and --execute.  With --dry-run it's
     # only interesting if --print is specified, too; then the user can
-@@ -10100,8 +10435,11 @@
+@@ -10395,8 +10730,11 @@
     @drop_trigger_sqls = ();
     foreach my $trg ( @triggers ) {
        my ($name, $sql) = @$trg;
@@ -640,7 +640,7 @@
           osc_retry(
              Cxn     => $cxn,
              Retry   => $retry,
-@@ -10302,11 +10640,12 @@
+@@ -10597,11 +10935,12 @@
     );
  
     return osc_retry(
@@ -658,7 +658,7 @@
           # ###################################################################
           # Start timing the query.
           # ###################################################################
-@@ -10981,7 +11320,7 @@
+@@ -11301,7 +11640,7 @@
  
  Specifying C<--no-drop-new-table> and C<--no-swap-tables> leaves the new,
  altered copy of the table without modifying the original table.  See
@@ -667,9 +667,9 @@
  
  L<--no-drop-new-table> does not work with
  C<alter-foreign-keys-method drop_swap>.
-@@ -11017,6 +11356,16 @@
- documentation and understand how to use this tool.  If you have not read the
- documentation, then do not specify this option.
+@@ -11341,6 +11680,16 @@
+ 
+ This options bypasses confirmation in case of using alter-foreign-keys-method = none , which might break foreign key constraints.
  
 +=item --exit-at
 +
@@ -684,9 +684,9 @@
  =item --help
  
  Show help and exit.
-@@ -11027,6 +11376,19 @@
- 
- Connect to host.
+@@ -11363,6 +11712,19 @@
+ Default is no Flow Control checking.
+ This option is available for PXC versions 5.6 or higher.
  
 +=item --load-state
 +
@@ -704,7 +704,7 @@
  =item --max-lag
  
  type: time; default: 1s
-@@ -11083,7 +11445,7 @@
+@@ -11419,7 +11781,7 @@
  table name.  When the default is used, the tool prefixes the name with up
  to 10 C<_> (underscore) to find a unique table name.  If a table name is
  specified, the tool does not prefix it with C<_>, so the table must not
@@ -713,7 +713,7 @@
  
  =item --password
  
-@@ -11186,6 +11548,14 @@
+@@ -11523,6 +11885,14 @@
  table. Currently, the DSNs are ordered by id, but id and parent_id are otherwise
  ignored.  
  
@@ -728,7 +728,7 @@
  =item --set-vars
  
  type: Array
-@@ -11227,6 +11597,18 @@
+@@ -11573,6 +11943,18 @@
  place of the original table.  The original table becomes the "old table," and
  the tool drops it unless you disable L<"--[no]drop-old-table">.
  
