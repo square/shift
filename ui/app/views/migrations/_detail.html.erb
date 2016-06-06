@@ -60,24 +60,7 @@
     <div class="col-md-2 col-md-offset-3">
       <strong><%= field.gsub(/_/, ' ') %></strong>
       <% if field == "table" %>
-        <span id="table_stats" data-content='
-          <table class="table"> 
-            <thead>
-              <tr>
-              <th class="text-center">Most Recent Alter Date</th>
-              <th class="text-center">Most Recent Alter Duration</th>
-              <th class="text-center">Average Alter Duration</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-              <td class="text-center"><%= @last_alter_date %></td>
-              <td class="text-center"><%= @last_alter_duration %></td>
-              <td class="text-center"><%= @average_alter_duration %></td>
-              </tr>
-            </tbody>
-          </table>
-        '>
+        <span id="table_stats">
           <span id="table_stats_icon" class="glyphicon glyphicon-stats" aria-hidden="true"></span>
           <span id="table_stats_new">new</span>
         </span>

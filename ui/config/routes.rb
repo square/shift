@@ -15,6 +15,7 @@ Rails.application.routes.draw do
       post 'resume'
       post 'dequeue'
       get 'refresh_detail'
+      get 'table_stats'
     end
   end
   get '/ptosc_log_file/:id', to: 'log#ptosc_log_file'

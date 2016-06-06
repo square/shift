@@ -69,24 +69,70 @@ function postComment(author, comment, migration_id) {
     });
 }
 
-var popoverActive = false;
-function makeStatsPopover() {
+var tableStatsTemplate = '<table class="table">\
+    <thead>\
+        <tr>\
+        <th class="text-center">Most Recent Alter Date</th>\
+        <th class="text-center">Most Recent Alter Duration</th>\
+        <th class="text-center">Average Alter Duration</th>\
+        </tr>\
+    </thead>\
+    <tbody>\
+        <tr>\
+        <td class="text-center">@last_alter_date</td>\
+        <td class="text-center">@last_alter_duration</td>\
+        <td class="text-center">@average_alter_duration</td>\
+        </tr>\
+    </tbody>\
+</table>'
+function makeStatsPopover(popoverData) {
+    var content;
+    if (popoverData.last_alter_date == null) {
+        content = '<div id="table_stats_loading"></div>'
+    } else {
+        content = tableStatsTemplate.replace("@last_alter_date", popoverData.last_alter_date)
+            .replace("@last_alter_duration", popoverData.last_alter_duration)
+            .replace("@average_alter_duration", popoverData.average_alter_duration)
+    }
     $("#table_stats").popover({
         animation: false,
         html: true,
         title: "Table Stats",
-        trigger: "hover"
+        trigger: "hover",
+        content: content
     });
     $("#table_stats").on("show.bs.popover", function() {
-        popoverActive = true;
+        popoverData.active = true;
     });
+    $("#table_stats").on("shown.bs.popover", function() {
+        new Spinner({color: "#1a2125", scale: 0.75, width: 4, top: "65%", zIndex: 1})
+            .spin(document.getElementById("table_stats_loading"));
+    })
     $("#table_stats").on("hide.bs.popover", function() {
-        popoverActive = false;
+        popoverData.active = false;
     });
-    if (popoverActive) {
+    if (popoverData.active) {
         $("#table_stats").popover("show");
     }
+}
 
+function getTableStatsData(popoverData) {
+    $.ajax({
+        method: "GET",
+        url: "/migrations/" + $("#migration-id").html() + "/table_stats",
+        success: function(result) {
+            popoverData.last_alter_date = result.last_alter_date;
+            popoverData.last_alter_duration = result.last_alter_duration;
+            popoverData.average_alter_duration = result.average_alter_duration;
+            $("#table_stats").data("bs.popover").options.content = tableStatsTemplate
+                .replace("@last_alter_date", popoverData.last_alter_date)
+                .replace("@last_alter_duration", popoverData.last_alter_duration)
+                .replace("@average_alter_duration", popoverData.average_alter_duration)
+            if (popoverData.active) {
+                $("#table_stats").popover("show")
+            }
+        }
+    })
 }
 
 $(document).ready(function() {
@@ -156,6 +202,12 @@ $(document).ready(function() {
 
     // function to run on migration detail page
     if ($("#migration-detail").length) {
+        var popoverData = {
+            "active": false,
+            "last_alter_date": null,
+            "last_alter_duration": null,
+            "average_alter_duration": null
+        }
         // refresh the migration details every 15 seconds
         var interval = setInterval(function refreshDetail() {
             var previousPercent = parseInt($(".progressBar").attr("data-value"));
@@ -183,7 +235,7 @@ $(document).ready(function() {
                         var valor = Number(result["copy_percentage"]);
                         progress(valor, bar);
                     }
-                    makeStatsPopover();
+                    makeStatsPopover(popoverData);
                 },
                 error: function(data) {
                   if (data.status == 404) {
@@ -193,7 +245,7 @@ $(document).ready(function() {
                 async: true,
             });
         }, 15000);
+        getTableStatsData(popoverData);
+        makeStatsPopover(popoverData);
     };
-
-    makeStatsPopover();
 })
