@@ -11,6 +11,10 @@ Apply this patch to pt-online-schema-change on the system where shift-runner liv
 
 The save/load state flags essentially allow you to resume OSCs that either failed or were manually stopped. If, for example, the db an osc is running against exceeded the max # threads running threshold, pt-osc will stop. Normally you would have to start the osc over again, but if you were running with the save-state flag then you could resume without losing progress by running with the load-state flag.
 
+### Future Improvements
+* When resuming pt-osc with --load-state, the logging doesn't accurately represent what's happening. Specifically, pt-osc will still log that it's doing some of the early steps in the process (ex: creating the shadow table) even if it is actually skipping those steps. This is just a logging problem.
+* When resuming pt-osc with --load-state, it would be ideal to load up the nibbling state that was saved with --save-state. As it stands now, when you resume pt-osc, it goes through the whole process of recalculating the rate/size at which it should nibble again. Also, because of this, the copy % that pt-osc emits will reflect the % of work left since being resumed (so it will reset to 0%, but it will progress faster).
+
 ## License
 
 Copyright (c) 2016 Square Inc. Distributed under the Apache 2.0 License.
