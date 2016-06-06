@@ -47,36 +47,31 @@ class MigrationsController < ApplicationController
     comment_authors.uniq.each do |a|
       @profile[a] = {:photo => profile_client.primary_photo(a)}
     end
-
-    begin
-      table = OscParser.new.parse(@migration.ddl_statement)[:table]
-    rescue # skip unparsable statements
-    end
-
-    @last_alter_date, @last_alter_duration, @average_alter_duration = get_table_stats(
-      @migration.cluster_name,
-      @migration.database,
-      table)
-
-
   end
 
   def refresh_detail
     @migration = Migration.find(params[:id])
     @status = Statuses.find_by_status!(@migration.status)
-    begin
-      table = OscParser.new.parse(@migration.ddl_statement)[:table]
-    rescue # skip unparsable statements
-    end
-    @last_alter_date, @last_alter_duration, @average_alter_duration = get_table_stats(
-      @migration.cluster_name,
-      @migration.database,
-      table)
     render :json => {:detailPartial => render_to_string('migrations/_detail', :layout => false,
                                                          :locals => { :migration => @migration, :status => @status}),
-                     :last_alter_date => @last_alter_date,:last_alter_duration => @last_alter_duration,
-                     :average_alter_duration => @average_alter_duration,
                      :copy_percentage => @migration.copy_percentage, :status => @migration.status}
+  end
+
+  def table_stats
+    migration = Migration.find(params[:id])
+    begin
+      table = OscParser.new.parse(migration.ddl_statement)[:table]
+    rescue # skip unpasable statements
+    end
+    last_alter_date, last_alter_duration, average_alter_duration = get_table_stats(
+      migration.cluster_name,
+      migration.database,
+      table)
+    render :json => {
+      :last_alter_date => last_alter_date,
+      :last_alter_duration => last_alter_duration,
+      :average_alter_duration => average_alter_duration
+    }
   end
 
   def status_image

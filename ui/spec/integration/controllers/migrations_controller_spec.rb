@@ -147,12 +147,6 @@ RSpec.describe MigrationsController, type: :controller do
     before (:each) do
       allow(Profile).to receive(:new).and_return(profile_client)
       allow(profile_client).to receive(:primary_photo).and_return("pic.img")
-      @completed_migration = FactoryGirl.create(:completed_migration,
-        cluster_name: @cluster.name,
-        database: "testdb",
-        ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL",
-        started_at: Time.new(2015, 5, 20, 2, 2, 2),
-        completed_at: Time.new(2015, 5, 20, 3, 4, 5))
       @migration = FactoryGirl.create(:pending_migration,
         cluster_name: @cluster.name,
         database: "testdb",
@@ -178,23 +172,10 @@ RSpec.describe MigrationsController, type: :controller do
       expect(response).to render_template(:show)
       expect(assigns(:profile)).to eq(profile)
     end
-
-    it 'assigns correct details to table stats popover' do
-      expect(response).to render_template(:show)
-      expect(assigns(:last_alter_date)).to eq("05/20/2015")
-      expect(assigns(:last_alter_duration)).to eq("01:02:03")
-      expect(assigns(:average_alter_duration)).to eq("01:02:03")
-    end
   end
 
   describe 'GET #refresh_detail' do
     before (:each) do
-      @completed_migration = FactoryGirl.create(:completed_migration,
-        cluster_name: @cluster.name,
-        database: "testdb",
-        ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL",
-        started_at: Time.new(2015, 5, 20, 2, 2, 2),
-        completed_at: Time.new(2015, 5, 20, 3, 4, 5))
       @migration = FactoryGirl.create(:running_migration,
         cluster_name: @cluster.name,
         database: "testdb",
@@ -220,12 +201,37 @@ RSpec.describe MigrationsController, type: :controller do
       expect(JSON.load(response.body)["status"]).to eq(@migration.status)
       expect(JSON.load(response.body)["copy_percentage"]).to eq(@migration.copy_percentage)
     end
+  end
 
-    it 'assigns correct details to table stats popover' do
-      expect(response).to render_template(:partial => 'migrations/_detail')
-      expect(assigns(:last_alter_date)).to eq("05/20/2015")
-      expect(assigns(:last_alter_duration)).to eq("01:02:03")
-      expect(assigns(:average_alter_duration)).to eq("01:02:03")
+  describe 'GET #table_stats' do
+    before (:each) do 
+      @completed_migration = FactoryGirl.create(:completed_migration,
+        cluster_name: @cluster.name,
+        database: "testdb",
+        ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL",
+        started_at: Time.new(2015, 5, 20, 2, 2, 2),
+        completed_at: Time.new(2015, 5, 20, 3, 4, 5))
+      @migration = FactoryGirl.create(:running_migration,
+        cluster_name: @cluster.name,
+        database: "testdb",
+        ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL")
+      get :table_stats, id: @migration
+    end
+
+    it 'returns a 200 status code' do
+      expect(response).to have_http_status(200)
+    end
+
+    it 'returns the correct last_alter_date' do
+      expect(json["last_alter_date"]).to eq("05/20/2015")
+    end
+
+    it 'returns the correct last_alter_duration' do
+      expect(json["last_alter_duration"]).to eq("01:02:03")
+    end
+
+    it 'returns the correct average_alter_duration' do
+      expect(json["average_alter_duration"]).to eq("01:02:03")
     end
   end
 

@@ -208,6 +208,7 @@
 .popover {
   max-width: 380px;
   width: 380px;
+  min-height: 100px;
   z-index: 1;
 }
 
