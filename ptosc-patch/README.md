@@ -8,6 +8,8 @@ Apply this patch to pt-online-schema-change on the system where shift-runner liv
   * triggers (after creating the triggers)
   * copy (after copying the data to the new table)
   * rename (after renaming the tables)
+* `--log-timings`: log original table_size (data_length + index_length), new table_size, original table_rows, new table_rows, and the number of seconds the copy step took, to STDERR and syslog after the copy is completed.
+* `--swap-table-name`: name for the old table after it is swapped
 
 The save/load state flags essentially allow you to resume OSCs that either failed or were manually stopped. If, for example, the db an osc is running against exceeded the max # threads running threshold, pt-osc will stop. Normally you would have to start the osc over again, but if you were running with the save-state flag then you could resume without losing progress by running with the load-state flag.
 
