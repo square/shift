@@ -233,11 +233,11 @@ RSpec.describe MigrationsController, type: :controller do
     end
 
     it 'returns the correct last_alter_duration' do
-      expect(json["last_alter_duration"]).to eq("02:04:06")
+      expect(json["last_alter_duration"]).to eq(7446)
     end
 
     it 'returns the correct average_alter_duration' do
-      expect(json["average_alter_duration"]).to eq("01:33:04")
+      expect(json["average_alter_duration"]).to eq(5584.5)
     end
   end
 
