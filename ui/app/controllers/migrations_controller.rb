@@ -267,8 +267,8 @@ class MigrationsController < ApplicationController
 
       alter_duration = migration.completed_at - migration.started_at
 
-      last_alter_date = migration.started_at.to_s.split[0] if !last_alter_date
-      last_alter_duration = alter_duration if !last_alter_duration
+      last_alter_date = migration.started_at.to_s.split[0]
+      last_alter_duration = alter_duration
       times_altered += 1
       if average_alter_duration
         average_alter_duration = (average_alter_duration * (times_altered - 1) + alter_duration) / times_altered

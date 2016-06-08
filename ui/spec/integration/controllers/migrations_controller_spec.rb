@@ -205,12 +205,18 @@ RSpec.describe MigrationsController, type: :controller do
 
   describe 'GET #table_stats' do
     before (:each) do 
-      @completed_migration = FactoryGirl.create(:completed_migration,
+      @completed_migration1 = FactoryGirl.create(:completed_migration,
         cluster_name: @cluster.name,
         database: "testdb",
         ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL",
         started_at: Time.new(2015, 5, 20, 2, 2, 2),
         completed_at: Time.new(2015, 5, 20, 3, 4, 5))
+      @completed_migration2 = FactoryGirl.create(:completed_migration,
+        cluster_name: @cluster.name,
+        database: "testdb",
+        ddl_statement: "ALTER TABLE `test` MODIFY `asdf` VARCHAR (191) NOT NULL",
+        started_at: Time.new(2015, 6, 20, 2, 2, 2),
+        completed_at: Time.new(2015, 6, 20, 4, 6, 8))
       @migration = FactoryGirl.create(:running_migration,
         cluster_name: @cluster.name,
         database: "testdb",
@@ -223,15 +229,15 @@ RSpec.describe MigrationsController, type: :controller do
     end
 
     it 'returns the correct last_alter_date' do
-      expect(json["last_alter_date"]).to eq("05/20/2015")
+      expect(json["last_alter_date"]).to eq("06/20/2015")
     end
 
     it 'returns the correct last_alter_duration' do
-      expect(json["last_alter_duration"]).to eq("01:02:03")
+      expect(json["last_alter_duration"]).to eq("02:04:06")
     end
 
     it 'returns the correct average_alter_duration' do
-      expect(json["average_alter_duration"]).to eq("01:02:03")
+      expect(json["average_alter_duration"]).to eq("01:33:04")
     end
   end
 
