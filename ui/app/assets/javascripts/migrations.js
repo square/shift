@@ -122,12 +122,12 @@ function getTableStatsData(popoverData) {
         url: "/migrations/" + $("#migration-id").html() + "/table_stats",
         success: function(result) {
             popoverData.last_alter_date = result.last_alter_date;
-            popoverData.last_alter_duration = result.last_alter_duration;
-            popoverData.average_alter_duration = result.average_alter_duration;
+            popoverData.last_alter_duration = isNaN(result.last_alter_duration) ? result.last_alter_duration : toHHMMSS(result.last_alter_duration);
+            popoverData.average_alter_duration = isNaN(result.average_alter_duration) ? result.average_alter_duration : toHHMMSS(result.average_alter_duration);
             $("#table_stats").data("bs.popover").options.content = tableStatsTemplate
                 .replace("@last_alter_date", popoverData.last_alter_date)
-                .replace("@last_alter_duration", toHHMMSS(popoverData.last_alter_duration))
-                .replace("@average_alter_duration", toHHMMSS(popoverData.average_alter_duration))
+                .replace("@last_alter_duration", popoverData.last_alter_duration)
+                .replace("@average_alter_duration", popoverData.average_alter_duration)
             if (popoverData.active) {
                 $("#table_stats").popover("show")
             }
