@@ -281,8 +281,7 @@ class MigrationsController < ApplicationController
     return "N/A", "N/A", "N/A" if times_altered == 0
 
     return Date.strptime(last_alter_date, ("%Y-%m-%d")).strftime("%m/%d/%Y"),
-      Time.at(last_alter_duration).utc.strftime("%H:%M:%S"),
-      Time.at(average_alter_duration).utc.strftime("%H:%M:%S")
+      last_alter_duration, average_alter_duration
   end
 
   def send_notifications
