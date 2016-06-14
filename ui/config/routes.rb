@@ -18,7 +18,7 @@ Rails.application.routes.draw do
       get 'table_stats'
     end
   end
-  get '/ptosc_log_file/:id', to: 'log#ptosc_log_file'
+  get '/shift_file/:migration_id', to: "shift_file#show"
   get '/databases', to: 'database#fetch'
   post '/parser', to: 'parser#parse'
   get '/status_image/:id', to: 'migrations#status_image'
@@ -56,6 +56,8 @@ Rails.application.routes.draw do
           post 'cancel'
           post 'fail'
           post 'error'
+          post 'append_to_file'
+          post 'write_file'
         end
       end
       resources :migrations, :only => [:show, :update]

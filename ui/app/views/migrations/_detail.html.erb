@@ -90,7 +90,7 @@
 <% if use_ptosc? %>
   <div class="row detail_data">
     <div class="col-md-2 col-md-offset-3"><strong>ptosc log file</strong></div>
-    <div class="col-md-6"><%= link_to "link", '/ptosc_log_file/' + @migration.id.to_s %></div>
+    <div class="col-md-6"><%= link_to "link", '/shift_file/' + @migration.id.to_s + '?file_type=' + ShiftFile.file_types[:log].to_s %></div>
   </div>
 <% end %>
 

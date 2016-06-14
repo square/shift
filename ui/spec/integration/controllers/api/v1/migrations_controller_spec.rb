@@ -392,4 +392,66 @@ RSpec.describe Api::V1::MigrationsController, type: :controller do
       expect(response).to have_http_status(200)
     end
   end
+
+  describe 'POST #append_to_file' do
+    before (:each) do
+      @log_type = ShiftFile.file_types[:log]
+    end
+
+    it 'creates a new file if file not found' do
+      post :append_to_file, migration_id: 123, file_type: @log_type, contents: "test content"
+      expect(response).to have_http_status(200)
+      expect(json["migration_id"]).to eq(123)
+      expect(json["file_type"]).to eq(@log_type)
+      expect(json["contents"]).to eq("Content omitted...")
+      expect(ShiftFile.find_by(migration_id: 123, file_type: @log_type).contents).to eq("test content")
+    end
+
+    it 'appends to contents if file already exists' do
+      @shift_file = FactoryGirl.create(:shift_file, migration_id: 123, file_type: @log_type, contents: "test content")
+      post :append_to_file, migration_id: 123, file_type: @log_type, contents: "test content"
+      expect(response).to have_http_status(200)
+      expect(json["id"]).to eq(@shift_file.id)
+      expect(json["migration_id"]).to eq(123)
+      expect(json["file_type"]).to eq(@log_type)
+      expect(json["contents"]).to eq("Content omitted...")
+      expect(ShiftFile.find_by(migration_id: 123, file_type: @log_type).contents).to eq("test contenttest content")
+    end
+
+    it 'errors when file type is not appendable' do
+      post :append_to_file, migration_id: 123, file_type: ShiftFile.file_types[:state], contents: "test content"
+      expect(response).to have_http_status(400)
+    end
+  end
+
+  describe 'POST #write_file' do
+    before (:each) do
+      @state_type = ShiftFile.file_types[:state]
+    end
+
+    it 'creates a new file if file not found' do
+      post :write_file, migration_id: 123, file_type: @state_type, contents: "test content"
+      expect(response).to have_http_status(200)
+      expect(json["migration_id"]).to eq(123)
+      expect(json["file_type"]).to eq(@state_type)
+      expect(json["contents"]).to eq("Content omitted...")
+      expect(ShiftFile.find_by(migration_id: 123, file_type: @state_type).contents).to eq("test content")
+    end
+
+    it 'overwrites contents if file already exists' do
+      @shift_file = FactoryGirl.create(:shift_file, migration_id: 123, file_type: @state_type, contents: "test content")
+      post :write_file, migration_id: 123, file_type: @state_type, contents: "hi i am a content"
+      expect(response).to have_http_status(200)
+      expect(json["id"]).to eq(@shift_file.id)
+      expect(json["migration_id"]).to eq(123)
+      expect(json["file_type"]).to eq(@state_type)
+      expect(json["contents"]).to eq("Content omitted...")
+      expect(ShiftFile.find_by(migration_id: 123, file_type: @state_type).contents).to eq("hi i am a content")
+    end
+
+    it 'errors when file type is not writable' do
+      post :write_file, migration_id: 123, file_type: ShiftFile.file_types[:log], contents: "test content"
+      expect(response).to have_http_status(400)
+    end
+  end
 end
