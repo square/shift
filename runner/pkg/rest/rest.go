@@ -21,6 +21,8 @@ var (
 	ErrCancel        = errors.New("rest: error canceling migration")
 	ErrFail          = errors.New("rest: error failing migration")
 	ErrError         = errors.New("rest: error error-ing out migration")
+	ErrAppendToFile  = errors.New("rest: error appending to shift file")
+	ErrWriteFile     = errors.New("rest: error writing to shift file")
 )
 
 // restClient contains the http client used to talk to the REST api,
@@ -93,18 +95,15 @@ func (restClient *restClient) post(resource string, urlParams map[string]string)
 	client := restClient.Client
 	api := restClient.api
 	url := api + resource
-
 	data, err := json.Marshal(urlParams)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := client.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	// Parse the response into JSON
 	decoder := json.NewDecoder(resp.Body)
 	var response map[string]interface{}
@@ -231,6 +230,26 @@ func (restClient *restClient) Error(params map[string]string) (RestResponseItem,
 	response, err := restClient.post(resource, params)
 	if err != nil {
 		return nil, ErrError
+	}
+	return response, nil
+}
+
+// AppendToFile appends some lines to a shift file
+func (restClient *restClient) AppendToFile(params map[string]string) (RestResponseItem, error) {
+	resource := "migrations/append_to_file"
+	response, err := restClient.post(resource, params)
+	if err != nil {
+		return nil, ErrAppendToFile
+	}
+	return response, nil
+}
+
+// WriteFile overwrites a shift file
+func (restClient *restClient) WriteFile(params map[string]string) (RestResponseItem, error) {
+	resource := "migrations/write_file"
+	response, err := restClient.post(resource, params)
+	if err != nil {
+		return nil, ErrWriteFile
 	}
 	return response, nil
 }

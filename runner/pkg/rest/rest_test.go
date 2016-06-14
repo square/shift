@@ -20,6 +20,14 @@ func initMigration() RestResponseItem {
 	return migration
 }
 
+func initShiftFile() RestResponseItem {
+	shiftFile := make(RestResponseItem)
+	shiftFile["migration_id"] = testMigId
+	shiftFile["file_type"] = "0"
+	shiftFile["contents"] = ""
+	return shiftFile
+}
+
 // when a response doesn't have an "id" field after an unstage, it is considered
 // to have been picked up by another runner before we could get a lock ("stolen").
 func initMigrationStolen() RestResponseItem {
@@ -55,6 +63,8 @@ func initMigrationsJson() {
 		http.HandleFunc("/api/v1/migrations/complete", httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/cancel", httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/"+testMigId, httpJsonHandler)
+		http.HandleFunc("/api/v1/migrations/append_to_file", httpJsonHandlerShiftFile)
+		http.HandleFunc("/api/v1/migrations/write_file", httpJsonHandlerShiftFile)
 		// stolen migrations
 		http.HandleFunc("/api/v1/stolen/migrations/unstage", httpJsonHandlerStolen)
 		http.ListenAndServe("localhost:12345", nil)
@@ -107,6 +117,20 @@ func httpJsonHandlerArray(w http.ResponseWriter, r *http.Request) {
 	migrationArray := initMigrationArray()
 
 	js, err := json.Marshal(migrationArray)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
+}
+
+func httpJsonHandlerShiftFile(w http.ResponseWriter, r *http.Request) {
+	shiftFile := initShiftFile()
+
+	js, err := json.Marshal(shiftFile)
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -327,6 +351,58 @@ func TestErrorMigration(t *testing.T) {
 	for k, v := range response {
 		actual := v
 		expected := expectedMigration[k]
+		if expected != actual {
+			t.Errorf("response = %v, want %v", actual, expected)
+		}
+	}
+}
+
+func TestAppendToFile(t *testing.T) {
+	initMigrationsJson()
+
+	client, err := New("http://localhost:12345/api/v1/", "", "")
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	urlParams := make(map[string]string)
+	urlParams["migration_id"] = testMigId
+	urlParams["file_type"] = "0"
+	urlParams["contents"] = "test content"
+	response, err := client.AppendToFile(urlParams)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expectedShiftFile := initShiftFile()
+	for k, v := range response {
+		actual := v
+		expected := expectedShiftFile[k]
+		if expected != actual {
+			t.Errorf("response = %v, want %v", actual, expected)
+		}
+	}
+}
+
+func TestWriteFile(t *testing.T) {
+	initMigrationsJson()
+
+	client, err := New("http://localhost:12345/api/v1/", "", "")
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	urlParams := make(map[string]string)
+	urlParams["migration_id"] = testMigId
+	urlParams["file_type"] = "0"
+	urlParams["contents"] = "test content"
+	response, err := client.WriteFile(urlParams)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expectedShiftFile := initShiftFile()
+	for k, v := range response {
+		actual := v
+		expected := expectedShiftFile[k]
 		if expected != actual {
 			t.Errorf("response = %v, want %v", actual, expected)
 		}

@@ -42,4 +42,14 @@ type RestClient interface {
 	// Returns result as map of strings to interfaces, where keys and
 	// values describe all of the fields of a migration.
 	Error(params map[string]string) (RestResponseItem, error)
+
+	// Makes a POST request to the shift api at "/append_to_file".
+	// Returns result as map of strings to interfaces, where keys and
+	// values describe all of the fields of the file minus the contents
+	AppendToFile(params map[string]string) (RestResponseItem, error)
+
+	// Makes a POST request to the shift api at "/write_file".
+	// Returns result as map of strings to interfaces, where keys and
+	// values describe all of the fields of the file minus the contents
+	WriteFile(params map[string]string) (RestResponseItem, error)
 }

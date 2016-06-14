@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20160127191624) do
+ActiveRecord::Schema.define(version: 20160606143900) do
 
   create_table "clusters", force: :cascade do |t|
     t.string  "name",                  limit: 255
@@ -84,6 +84,16 @@ ActiveRecord::Schema.define(version: 20160127191624) do
   end
 
   add_index "owners", ["cluster_name", "username"], name: "index_owners_on_cluster_name_and_username", unique: true, using: :btree
+
+  create_table "shift_files", force: :cascade do |t|
+    t.integer  "migration_id", limit: 4
+    t.integer  "file_type",    limit: 1
+    t.datetime "created_at"
+    t.datetime "updated_at"
+    t.binary   "contents",     limit: 4294967295
+  end
+
+  add_index "shift_files", ["migration_id", "file_type"], name: "index_shift_files_on_migration_id_and_file_type", unique: true, using: :btree
 
   create_table "statuses", force: :cascade do |t|
     t.integer "status",      limit: 4

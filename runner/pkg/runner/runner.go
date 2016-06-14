@@ -3,6 +3,7 @@ package runner
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +27,9 @@ const (
 	// how often pt-osc should print out copy % during copy step
 	ptOscProgress = "time,5"
 	SIGKILLSignal = "killed"
+
+	LOG_FILE_TYPE   = "0"
+	STATE_FILE_TYPE = "1"
 )
 
 var (
@@ -90,6 +94,8 @@ type runner struct {
 	PortOverride      int    `yaml:"port_override"`
 	DatabaseOverride  string `yaml:"database_override"`
 	Hostname          string
+	LogSyncInterval   int `yaml:"log_sync_interval"`
+	StateSyncInterval int `yaml:"state_sync_interval"`
 }
 
 type TableStats struct {
@@ -644,22 +650,94 @@ type writeToWriter func(*bufio.Writer, string, time.Time) error
 
 // writeToPtOscLog takes log lines it receives from a channel and passes them
 // to a function that will write them
-func writeToPtOscLog(ptOscLogWriter *bufio.Writer, ptOscLogChan chan string, writerFunc writeToWriter) {
+// Also writes to a buffer which is POSTed to append_to_file when a new log line appears
+// after LogSyncInterval seconds
+func (runner *runner) writeToPtOscLog(ptOscLogWriter *bufio.Writer, ptOscLogChan chan string, writerFunc writeToWriter, migrationId int, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
+	var buffer bytes.Buffer
+	lastPostTime := time.Unix(0, 0)
 	for line := range ptOscLogChan {
 		currentTime := time.Now().Local()
-		err := writerFunc(ptOscLogWriter, line, currentTime)
+		formattedLine := "[" + currentTime.Format("2006-01-02 15:04:05") + "] " + line
+		err := writerFunc(ptOscLogWriter, formattedLine, currentTime)
 		if err != nil {
 			glog.Errorf("Error flushing pt-osc log file (error: %s)", err)
+		}
+		_, err = buffer.WriteString(formattedLine + "\n")
+		if err != nil {
+			glog.Errorf("Error writing to log buffer (error: %s)", err)
+		}
+
+		if int(currentTime.Sub(lastPostTime)/time.Second) >= runner.LogSyncInterval && buffer.Len() > 0 {
+			err = runner.postLogToFileApi(&buffer, migrationId)
+			if err == nil {
+				lastPostTime = currentTime
+			}
+		}
+	}
+
+	runner.postLogToFileApi(&buffer, migrationId)
+}
+
+// postLogToFileApi POSTs the lines in buffer to append_to_file as a log file then clears the buffer
+func (runner *runner) postLogToFileApi(buffer *bytes.Buffer, migrationId int) error {
+	if buffer.Len() == 0 {
+		return nil
+	}
+	urlParams := make(map[string]string)
+	urlParams["migration_id"] = strconv.Itoa(migrationId)
+	urlParams["file_type"] = LOG_FILE_TYPE
+	urlParams["contents"] = buffer.String()
+	_, err := runner.RestClient.AppendToFile(urlParams)
+	if err != nil {
+		glog.Errorf("Error POSTing to append_to_file endpoint (error: %s)", err)
+		return err
+	}
+	buffer.Reset()
+	glog.Infof("Sent log lines to append_to_file endpoint")
+	return nil
+}
+
+// writeLineToPtOscLog writes a single line to a log file
+func writeLineToPtOscLog(ptOscLogWriter *bufio.Writer, logMsg string, currentTime time.Time) error {
+	glog.Infof("pt-osc output: %s", logMsg)
+	fmt.Fprintln(ptOscLogWriter, logMsg)
+	return ptOscLogWriter.Flush()
+}
+
+// syncStateFile periodically reads a migration's statefile and sends it to the api
+func (runner *runner) syncStateFile(migration *migration.Migration, quit chan string, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
+	for {
+		select {
+		case <-quit:
+			glog.Infof("Stopped syncing state file")
+			runner.postStateFile(migration)
+			return
+		default:
+			runner.postStateFile(migration)
+			time.Sleep(time.Duration(runner.StateSyncInterval) * time.Second)
 		}
 	}
 }
 
-// writeLineToPtOscLog writes a single line to a log file
-func writeLineToPtOscLog(ptOscLogWriter *bufio.Writer, line string, currentTime time.Time) error {
-	glog.Infof("pt-osc output: %s", line)
-	logMsg := "[" + currentTime.Format("2006-01-02 15:04:05") + "] " + line
-	fmt.Fprintln(ptOscLogWriter, logMsg)
-	return ptOscLogWriter.Flush()
+func (runner *runner) postStateFile(migration *migration.Migration) {
+	data, err := migration.ReadStateFile()
+	if err != nil {
+		glog.Warningf("Could not read state file (%s)", err)
+	} else {
+		urlParams := make(map[string]string)
+		urlParams["migration_id"] = strconv.Itoa(migration.Id)
+		urlParams["file_type"] = STATE_FILE_TYPE
+		urlParams["contents"] = string(data[:])
+
+		_, err = runner.RestClient.WriteFile(urlParams)
+		if err != nil {
+			glog.Errorf("Error POSTing to write_file endpoint (error: %s)", err)
+		} else {
+			glog.Infof("Sent state file to write_file endpoint")
+		}
+	}
 }
 
 // function type for generating exec command options
@@ -703,6 +781,8 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOptionGenerator commandOptionGenerator, copyPercentChan chan int) (bool, error) {
 	canceled := false
 
+	var waitGroup sync.WaitGroup
+
 	// create a file and writer for logging pt-osc output
 	ptOscLogFileDir := runner.LogDir + "id-" + strconv.Itoa(currentMigration.Id)
 	if _, err := os.Stat(ptOscLogFileDir); err != nil {
@@ -725,10 +805,6 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 		return canceled, ErrPtOscExec
 	}
 	defer ptOscLogFile.Close()
-
-	// setup a channel and goroutine for logging output of stdout/stderr
-	ptOscLogChan := make(chan string)
-	go writeToPtOscLog(ptOscLogWriter, ptOscLogChan, writeLineToPtOscLog)
 
 	// generate the pt-osc command to run
 	commandOptions := ptOscOptionGenerator(currentMigration)
@@ -753,15 +829,24 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 		return canceled, ErrPtOscExec
 	}
 
+	// setup a channel and goroutine for logging output of stdout/stderr
+	ptOscLogChan := make(chan string)
+	waitGroup.Add(1)
+	go runner.writeToPtOscLog(ptOscLogWriter, ptOscLogChan, writeLineToPtOscLog, currentMigration.Id, &waitGroup)
+
+	// setup a goroutine for sending statefiles to the api
+	ptOscStateFileChan := make(chan string)
+	waitGroup.Add(1)
+	go runner.syncStateFile(currentMigration, ptOscStateFileChan, &waitGroup)
+
 	// setup goroutines for watching stdout/stderr of the command
 	stdoutErrChan := make(chan error)
 	stderrErrChan := make(chan error)
-	var copyPercentCloseChan chan int
 	go currentMigration.WatchMigrationStdout(stdout, stdoutErrChan, ptOscLogChan)
 	if currentMigration.Status == migration.RunMigrationStatus {
 		// setup a goroutine to continually update the % copied of the migration
-		copyPercentCloseChan = make(chan int, 1)
-		go runner.updateMigrationCopyPercentage(currentMigration, copyPercentChan, copyPercentCloseChan)
+		waitGroup.Add(1)
+		go runner.updateMigrationCopyPercentage(currentMigration, copyPercentChan, &waitGroup)
 		go currentMigration.WatchMigrationCopyStderr(stderr, copyPercentChan, stderrErrChan, ptOscLogChan)
 	} else {
 		go currentMigration.WatchMigrationStderr(stderr, stderrErrChan, ptOscLogChan)
@@ -780,6 +865,7 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 	stdoutErr := <-stdoutErrChan
 	stderrErr := <-stderrErrChan
 	close(ptOscLogChan)
+	close(ptOscStateFileChan)
 
 	// get the exit status of the command. if it was sent a SIGKILL (most likely
 	// by another goroutine) we want to know because we will treat it differently
@@ -810,9 +896,9 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 
 	if copyPercentChan != nil {
 		close(copyPercentChan)
-		// wait for last job to finish
-		<-copyPercentCloseChan
 	}
+
+	waitGroup.Wait() // wait for go routines to finish
 
 	// remove the migration id from the running migration map
 	runningMigMutex.Lock()
@@ -834,7 +920,8 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 
 // updateMigrationCopyPercentage watches a channel for a running migration and
 // sends the copy percentage completed (from the channel) to the shift api
-func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.Migration, copyPercentChan chan int, copyPercentCloseChan chan int) {
+func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.Migration, copyPercentChan chan int, waitGroup *sync.WaitGroup) {
+	defer waitGroup.Done()
 	migrationId := strconv.Itoa(currentMigration.Id)
 	for copyPercentage := range copyPercentChan {
 		// send the table stats to the api
@@ -847,7 +934,6 @@ func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.
 			glog.Errorf("mig_id=%d: error updating copy percentage (error: %s). Continuing anyway", migrationId, err)
 		}
 	}
-	copyPercentCloseChan <- 1
 }
 
 func Start(configFile string) error {

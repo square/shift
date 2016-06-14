@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"regexp"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -33,6 +35,8 @@ const (
 var (
 	validTableStats = migration.TableStats{TableRows: "5", TableSize: "98", IndexSize: "32"}
 	payloadReceived map[string]string
+	writePayload    map[string]string
+	appendPayload   []map[string]string
 )
 
 func validTableStatsPayload(id, startOrEnd string) map[string]string {
@@ -48,14 +52,16 @@ func validTableStatsPayload(id, startOrEnd string) map[string]string {
 // 1 means return a normal response, anything else means return an error.
 type stubRestClient struct {
 	// methods
-	staged   int
-	unstage  int
-	nextStep int
-	update   int
-	complete int
-	fail     int
-	err      int
-	cancel   int
+	staged       int
+	unstage      int
+	nextStep     int
+	update       int
+	complete     int
+	fail         int
+	err          int
+	cancel       int
+	appendToFile int
+	writeFile    int
 }
 
 func (restClient stubRestClient) Staged() (rest.RestResponseItems, error) {
@@ -153,6 +159,31 @@ func (restClient stubRestClient) Cancel(params map[string]string) (rest.RestResp
 	}
 }
 
+func (restClient stubRestClient) AppendToFile(params map[string]string) (rest.RestResponseItem, error) {
+	params["contents"] = params["contents"][22:] // rips out timestamp
+	appendPayload = append(appendPayload, params)
+	if restClient.appendToFile == 0 {
+		return rest.RestResponseItem{}, nil
+	} else if restClient.appendToFile == 1 {
+		shiftFile := make(map[string]interface{})
+		return shiftFile, nil
+	} else {
+		return nil, rest.ErrAppendToFile
+	}
+}
+
+func (restClient stubRestClient) WriteFile(params map[string]string) (rest.RestResponseItem, error) {
+	writePayload = params
+	if restClient.writeFile == 0 {
+		return rest.RestResponseItem{}, nil
+	} else if restClient.writeFile == 1 {
+		shiftFile := make(map[string]interface{})
+		return shiftFile, nil
+	} else {
+		return nil, rest.ErrWriteFile
+	}
+}
+
 // initialize a stubbed rest client
 func initRestClient(staged, unstage, nextStep, update, fail int) stubRestClient {
 	return stubRestClient{
@@ -171,6 +202,8 @@ func initRunner(restClient stubRestClient, logDir, defaultsFile, ptOscPath strin
 	runner.LogDir = logDir
 	runner.MysqlDefaultsFile = defaultsFile
 	runner.PtOscPath = ptOscPath
+	runner.LogSyncInterval = 1
+	runner.StateSyncInterval = 1
 	return runner
 }
 
@@ -1154,7 +1187,9 @@ func TestKillMigration(t *testing.T) {
 // test recieiving log lines and sending them to a function to be written to
 // a log file
 func TestWriteToPtOscLog(t *testing.T) {
+	runner := initRunner(stubRestClient{}, "", "", "")
 	expectedLines := []string{"line one", "line two", "line three"}
+	regexString := "\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\] " // regex for matching timestamp
 	ptOscLogChan := make(chan string, 3)
 	for _, line := range expectedLines {
 		ptOscLogChan <- line
@@ -1162,11 +1197,19 @@ func TestWriteToPtOscLog(t *testing.T) {
 
 	actualLines := []string{}
 	writerFunc := func(writer *bufio.Writer, line string, time time.Time) error {
+		timestamp := line[:22]
+		line = line[22:] // rips out time stamp
+		match, _ := regexp.MatchString(regexString, timestamp)
+		if !match {
+			t.Errorf("timestamp = %v, want %v", timestamp, regexString)
+		}
 		actualLines = append(actualLines, line)
 		return nil
 	}
 	close(ptOscLogChan)
-	writeToPtOscLog(nil, ptOscLogChan, writerFunc)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1)
+	runner.writeToPtOscLog(nil, ptOscLogChan, writerFunc, 1, &waitGroup)
 	if !reflect.DeepEqual(actualLines, expectedLines) {
 		t.Errorf("lines = %v, want %v", actualLines, expectedLines)
 	}
@@ -1178,9 +1221,10 @@ func TestWriteLineToPtOscLog(t *testing.T) {
 	testWriter := bufio.NewWriter(writeBuffer)
 	line := "this is the message"
 	currentTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+	formattedLine := "[" + currentTime.Format("2006-01-02 15:04:05") + "] " + line
 
 	var expectedError error
-	actualError := writeLineToPtOscLog(testWriter, line, currentTime)
+	actualError := writeLineToPtOscLog(testWriter, formattedLine, currentTime)
 	if actualError != expectedError {
 		t.Errorf("error = %v, want %v", actualError, expectedError)
 	}
@@ -1252,34 +1296,43 @@ func TestGeneratePtOscCommand(t *testing.T) {
 
 // test exec-ing pt-online-schema-change
 var execPtOscTests = []struct {
-	status          int
-	logDir          string
-	commandPath     string
-	commandOptions  []string
-	kill            bool
-	diffKillSignal  bool
-	expectedCancel  bool
-	expectedPayload map[string]string
-	expectedError   error
+	status                int
+	logDir                string
+	commandPath           string
+	commandOptions        []string
+	kill                  bool
+	diffKillSignal        bool
+	expectedCancel        bool
+	expectedPayload       map[string]string
+	expectedError         error
+	expectedAppendPayload []map[string]string
+	expectedWritePayload  map[string]string
 }{
 	// fail to create a log file b/c dir already exists
-	{0, "id-f/", "fakecommand", nil, false, false, false, nil, ErrPtOscExec},
+	{0, "id-f/", "fakecommand", nil, false, false, false, nil, ErrPtOscExec, nil, nil},
 	// fail to create a log file b/c can't make dir
-	{0, "tmp/", "fakecommand", nil, false, false, false, nil, ErrPtOscExec},
+	{0, "tmp/", "fakecommand", nil, false, false, false, nil, ErrPtOscExec, nil, nil},
 	// fail to exec due to command not existing
-	{0, "", "fakecommand", nil, false, false, false, nil, ErrPtOscExec},
+	{0, "", "fakecommand", nil, false, false, false, nil, ErrPtOscExec, nil, nil},
 	// execute with an error in stderr
-	{0, "", "/bin/sh", []string{"runme"}, false, false, false, nil, migration.ErrPtOscUnexpectedStderr},
+	{0, "", "/bin/sh", []string{"runme"}, false, false, false, nil, migration.ErrPtOscUnexpectedStderr, []map[string]string{
+		map[string]string{"migration_id": "7", "file_type": "0", "contents": "stderr: something\n"}}, nil},
 	// execute without errors for a killed migration not on the runMigration step
-	{0, "", "sleep", []string{"5"}, true, false, false, nil, nil},
+	{0, "", "sleep", []string{"5"}, true, false, false, nil, nil, nil, nil},
 	// execute without errors for a killed migration (that received SIGKILL) on the runMigration step
-	{3, "", "sleep", []string{"5"}, true, false, true, nil, nil},
+	{3, "", "sleep", []string{"5"}, true, false, true, nil, nil, nil, nil},
 	// execute without errors for a killed migration (that received some other signal than SIGKILL) on the runMigration step
-	{3, "", "sleep", []string{"5"}, true, true, false, nil, ErrUnexpectedExit},
+	{3, "", "sleep", []string{"5"}, true, true, false, nil, ErrUnexpectedExit, nil, nil},
 	// execute without an error for a migration not on the runMigration step
-	{0, "", "sleep", []string{"0"}, false, false, false, nil, nil},
+	{0, "", "sleep", []string{"0"}, false, false, false, nil, nil, nil, nil},
 	// execute without an error for a migration on the runMigration step
-	{3, "", "sleep", []string{"0"}, false, false, false, map[string]string{"id": "7", "copy_percentage": "100"}, nil},
+	{3, "", "sleep", []string{"0"}, false, false, false, map[string]string{"id": "7", "copy_percentage": "100"}, nil, nil, nil},
+	// execute with output
+	{0, "", "/bin/sh", []string{"testscript"}, false, false, false, nil, nil, []map[string]string{
+		map[string]string{"migration_id": "7", "file_type": "0", "contents": "stdout: test 1\n"},
+		map[string]string{"migration_id": "7", "file_type": "0", "contents": "stdout: test 2\n"},
+		map[string]string{"migration_id": "7", "file_type": "0", "contents": "stdout: test 3\n"},
+	}, map[string]string{"migration_id": "7", "file_type": "1", "contents": "test 3\n"}},
 }
 
 func TestExecPtOsc(t *testing.T) {
@@ -1291,6 +1344,14 @@ func TestExecPtOsc(t *testing.T) {
 	unwriteableFile, _ := os.Create(unwriteableFileName)
 	_ = unwriteableFile.Chmod(0444)
 	unwriteableFile.Close()
+
+	// make the test bash script
+	testScriptName := "testscript"
+	testScript, _ := os.Create(testScriptName)
+	defer os.Remove(testScriptName)
+	testScript.Chmod(0777)
+	testScript.WriteString("touch ./id-7/statefile.txt; for i in {1..3}; do echo \"test $i\" | tee ./id-7/statefile.txt; sleep 2; done")
+	testScript.Close()
 
 	// write a bash script that can be exec-ed and will print to stderr,
 	// but will exit with status 0. kinda ghetto, but it works
@@ -1304,8 +1365,10 @@ func TestExecPtOsc(t *testing.T) {
 	for _, tt := range execPtOscTests {
 		os.RemoveAll(tt.logDir + "id-7")
 		payloadReceived = nil
+		appendPayload = nil
+		writePayload = nil
 		currentRunner := initRunner(stubRestClient{}, tt.logDir, "", tt.commandPath)
-		mig := &migration.Migration{Id: 7, Status: tt.status}
+		mig := &migration.Migration{Id: 7, Status: tt.status, StateFile: "id-7/statefile.txt"}
 
 		// specify the exact options we want
 		commandGenerator := func(*migration.Migration) []string {
@@ -1333,7 +1396,7 @@ func TestExecPtOsc(t *testing.T) {
 
 		// setup channel for receiving the copy % complete of the migration
 		var copyPercentChan chan int
-		if tt.expectedPayload != nil {
+		if tt.expectedPayload != nil || mig.Status == migration.RunMigrationStatus {
 			copyPercentChan = make(chan int)
 		}
 
@@ -1360,8 +1423,20 @@ func TestExecPtOsc(t *testing.T) {
 			t.Errorf("payload = %v, want %v", actualPayload, expectedPayload)
 		}
 
+		expectedAppendPayload := tt.expectedAppendPayload
+		actualAppendPayload := appendPayload
+		if !reflect.DeepEqual(actualAppendPayload, expectedAppendPayload) {
+			t.Errorf("append payload = %v, want %v", actualAppendPayload, expectedAppendPayload)
+		}
+
+		expectedWritePayload := tt.expectedWritePayload
+		actualWritePayload := writePayload
+		if !reflect.DeepEqual(actualWritePayload, expectedWritePayload) {
+			t.Errorf("write payload = %v, want %v", actualWritePayload, expectedWritePayload)
+		}
+
 		if tt.logDir == "" {
-			os.Remove("id-7")
+			os.RemoveAll("id-7")
 		} else {
 			os.Remove(tt.logDir)
 		}
@@ -1372,14 +1447,16 @@ func TestExecPtOsc(t *testing.T) {
 func TestUpdateMigrationCopyPercentage(t *testing.T) {
 	payloadReceived = nil
 	copyPercentChan := make(chan int, 1)
-	copyPercentClose := make(chan int, 1)
 	migration := &migration.Migration{Id: 7}
 	copyPercentage := 38
 	currentRunner := initRunner(stubRestClient{nextStep: 1}, "", "", "")
+	var waitGroup sync.WaitGroup
 
 	copyPercentChan <- copyPercentage
 	close(copyPercentChan)
-	currentRunner.updateMigrationCopyPercentage(migration, copyPercentChan, copyPercentClose)
+	waitGroup.Add(1)
+	currentRunner.updateMigrationCopyPercentage(migration, copyPercentChan, &waitGroup)
+	waitGroup.Wait()
 
 	expectedPayload := map[string]string{"id": "7", "copy_percentage": "38"}
 	actualPayload := payloadReceived

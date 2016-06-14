@@ -115,6 +115,48 @@ module Api
         render json: @migration
       end
 
+      def append_to_file
+        migration_id = params[:migration_id].to_i
+        file_type = params[:file_type].to_i
+        contents = params[:contents]
+
+        if !ShiftFile.file_types[:appendable].include?(file_type)
+          return render json: {message: "File type not appendable"}, status: 400
+        end
+
+        begin
+          shift_file = ShiftFile.find_or_create_by!(migration_id: migration_id, file_type: file_type)
+        rescue ActiveRecord::RecordNotUnique
+          return render json: {message: "Could not create new file because one already exists"}, status: 400
+        end
+        shift_file.contents = shift_file.contents.to_s + contents
+        shift_file.save
+        shift_file.contents = "Content omitted..." # content can be large, no value in returning it
+
+        render json: shift_file
+      end
+
+      def write_file
+        migration_id = params[:migration_id].to_i
+        file_type = params[:file_type].to_i
+        contents = params[:contents]
+
+        if !ShiftFile.file_types[:writable].include?(file_type)
+          return render json: {message: "File type not writable"}, status: 400
+        end
+
+        begin
+          shift_file = ShiftFile.find_or_create_by!(migration_id: migration_id, file_type: file_type)
+        rescue ActiveRecord::RecordNotUnique
+          return render json: {message: "Could not create new file because one already exists"}, status: 400
+        end
+        shift_file.contents = contents
+        shift_file.save
+        shift_file.contents = "Content omitted..." # content can be large, no value in returning it
+
+        render json: shift_file
+      end
+
       private
 
       def migration_params

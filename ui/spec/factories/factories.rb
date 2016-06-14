@@ -40,6 +40,12 @@ FactoryGirl.define do
     requestor "developer"
   end
 
+  factory :shift_file do
+    sequence :id do |n|
+      n
+    end
+  end
+
 
   factory :pending_migration, parent: :migration do
     status statuses[:pending].sample

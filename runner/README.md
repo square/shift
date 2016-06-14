@@ -57,6 +57,8 @@ Here are the configuration files that you will probably want to update (although
   * `log_dir`: the directory where the pt-osc state and output for all migrations will be stored
   * `pt_osc_path`: the path to the patched version of pt-osc
   * `pending_drops_db`: the name of the pending drops (trash can) db
+  * `log_sync_interval`: interval in seconds for uploading pt-osc log files to the ui
+  * `state_sync_interval`: same as above, but for pt-osc state files
   * `host_override`: if you specify a host here, it will override the host for all migrations exposed by the shift api. This is useful for a staging environment when you want to make sure you don't accidentally run migrations on live dbs
   * `port_override`: same as above, but for a port
   * `database_override`: same as above, but for a database
