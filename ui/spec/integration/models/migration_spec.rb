@@ -504,6 +504,31 @@ RSpec.describe Migration do
     end
   end
 
+  describe 'small_enough_for_short_run?' do
+    it 'is not because table_rows_start is null' do
+      migration = FactoryGirl.create(:approval_migration)
+      expect(migration.small_enough_for_short_run?).to eq(false)
+    end
+
+    it 'is not because there are too many rows' do
+      migration = FactoryGirl.create(:approval_migration,
+                                     :table_rows_start => Migration.small_table_row_limit + 1)
+      expect(migration.small_enough_for_short_run?).to eq(false)
+    end
+
+    it 'is not because meta_request_id is not null' do
+      migration = FactoryGirl.create(:approval_migration, :meta_request_id => 1,
+                                     :table_rows_start => Migration.small_table_row_limit - 1)
+      expect(migration.small_enough_for_short_run?).to eq(false)
+    end
+
+    it 'is small enough' do
+      migration = FactoryGirl.create(:approval_migration,
+                                     :table_rows_start => Migration.small_table_row_limit - 1)
+      expect(migration.small_enough_for_short_run?).to eq(true)
+    end
+  end
+
   describe 'authorized_actions' do
     it 'random case 1 (authorized approver for a mig awaiting approval)' do
       migration = FactoryGirl.create(:approval_migration)
@@ -523,7 +548,25 @@ RSpec.describe Migration do
       expect(output).to eq([:approve_long, :approve_short, :delete])
     end
 
-    it 'random case 3 (no authorization for a mig awaiting approval)' do
+    it 'random case 3 (authorized admin for a mig awaiting approval that is small_enough_for_short_run)' do
+      migration = FactoryGirl.create(:approval_migration, :table_rows_start => 4031)
+      output = migration.authorized_actions(
+        Migration.types[:run][:maybeshort],
+        Migration.types[:action][:alter],
+        true, false, false, true)
+      expect(output).to eq([:approve_short, :delete])
+    end
+
+    it 'random case 4 (authorized admin for a mig awaiting approval that is not small_enough_for_short_run)' do
+      migration = FactoryGirl.create(:approval_migration, :table_rows_start => 11000)
+      output = migration.authorized_actions(
+        Migration.types[:run][:maybeshort],
+        Migration.types[:action][:alter],
+        true, false, false, true)
+      expect(output).to eq([:approve_long, :approve_short, :delete])
+    end
+
+    it 'random case 5 (no authorization for a mig awaiting approval)' do
       migration = FactoryGirl.create(:approval_migration)
       output = migration.authorized_actions(
         Migration.types[:run][:maybeshort],
@@ -532,7 +575,7 @@ RSpec.describe Migration do
       expect(output).to eq([])
     end
 
-    it 'random case 4 (requestor for a mig awaiting approval)' do
+    it 'random case 6 (requestor for a mig awaiting approval)' do
       migration = FactoryGirl.create(:approval_migration)
       output = migration.authorized_actions(
         Migration.types[:run][:maybeshort],
@@ -541,7 +584,7 @@ RSpec.describe Migration do
       expect(output).to eq([:delete])
     end
 
-    it 'random case 5 (different actions for different run_actions)' do
+    it 'random case 7 (different actions for different run_actions)' do
       migration = FactoryGirl.create(:copy_migration)
       output = migration.authorized_actions(
         Migration.types[:run][:long],
