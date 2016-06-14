@@ -60,6 +60,8 @@ class Migration < ActiveRecord::Base
   # agent from running the prepare step for a ton of migrations at the same time (if
   # 30 are bulk uploaded at once, for example).
   UNSTAGE_LIMIT = 2
+  # allow short runs on tables with fewer than this many rows
+  SMALL_TABLE_ROW_LIMIT = 5000
 
   def manage_error(err, include_error)
     @parsed = {
@@ -138,6 +140,10 @@ class Migration < ActiveRecord::Base
 
   def self.unstage_limit
     UNSTAGE_LIMIT
+  end
+
+  def self.small_table_row_limit
+    SMALL_TABLE_ROW_LIMIT
   end
 
   def self.migrations_by_state(state, order: 'updated_at', limit: 5, additional_filters: {},
@@ -296,6 +302,18 @@ class Migration < ActiveRecord::Base
     cluster.app
   end
 
+  # the main goal of this is to get around the fact that pt-osc won't run on a table that
+  # has fewer rows than the chunk size on master, but more rows than the chunk size on at
+  # least one of its slaves (if it did run, you'd potentially lose rows on the slave). the
+  # default chunk size is 4000, but it doesn't hurt to go a little above that (5000 in this
+  # case). the reason we don't support this for migrations that belong to meta requests is
+  # because doing so without creating a bad user experience is pretty complicated.
+  # specifically, meta requests can't currently handle doing different types of approvals
+  # in bulk.
+  def small_enough_for_short_run?
+    !self.table_rows_start.nil? && self.table_rows_start <= SMALL_TABLE_ROW_LIMIT && self.meta_request_id.nil?
+  end
+
   # this function returns a list of actions that are available to run on a specific
   # migration, taking into account the migrations status, run type, and the authorization
   # of the user. we want to have authorization pre-calculated b/c it can be expensive
@@ -314,26 +332,26 @@ class Migration < ActiveRecord::Base
       if can_do_any_action
         case run_type
         when Migration.types[:run][:long]
-          [:approve_long, :delete]
+          [(self.small_enough_for_short_run? ? :approve_short : :approve_long), :delete]
         when Migration.types[:run][:short]
           [:approve_short, :delete]
         when Migration.types[:run][:maybeshort]
-          [:approve_long, :approve_short, :delete]
+          [(:approve_long unless self.small_enough_for_short_run?), :approve_short, :delete].compact
         when Migration.types[:run][:maybenocheckalter]
-          [:approve_nocheckalter, :delete]
+          [(self.small_enough_for_short_run? ? :approve_short : :approve_nocheckalter), :delete]
         else
           [:delete]
         end
       elsif can_approve
         case run_type
         when Migration.types[:run][:long]
-          [:approve_long, :delete]
+          [(self.small_enough_for_short_run? ? :approve_short : :approve_long), :delete]
         when Migration.types[:run][:short]
           [:approve_short, :delete]
         when Migration.types[:run][:maybeshort]
-          [:approve_long, :delete]
+          [(self.small_enough_for_short_run? ? :approve_short : :approve_long), :delete]
         when Migration.types[:run][:maybenocheckalter]
-          [:delete]
+          [(:approve_short if self.small_enough_for_short_run?), :delete].compact
         else
           [:delete]
         end

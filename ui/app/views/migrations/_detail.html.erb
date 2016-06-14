@@ -113,7 +113,7 @@
   <% if @status.action %>
     <% unless @migration.parsed[:error] %>
       <% if show_approve? %>
-        <% if @migration.parsed[:run] == :short %>
+        <% if @migration.parsed[:run] == :short || @migration.small_enough_for_short_run? %>
           <div class="row detail_button">
             <div class="col-md-1 col-md-offset-3">
               <%= button_to "#{@status.action}",
@@ -163,7 +163,8 @@
           </div>
         <% end %>
         <% if @migration.parsed[:run] == :maybeshort ||
-              @migration.parsed[:run] == :long %>
+              @migration.parsed[:run] == :long &&
+              !@migration.small_enough_for_short_run? %>
           <div class="row detail_button">
             <div class="col-md-1 col-md-offset-3">
               <%= button_to "#{@status.action}",
