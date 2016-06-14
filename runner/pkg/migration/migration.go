@@ -465,3 +465,7 @@ func (migration *Migration) WatchMigrationCopyStderr(stderrPipe io.Reader, copyP
 
 	errChan <- nil
 }
+
+func (migration *Migration) ReadStateFile() ([]byte, error) {
+	return ioutil.ReadFile(migration.StateFile)
+}
