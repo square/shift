@@ -266,6 +266,12 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			mig.Database = runner.DatabaseOverride
 		}
 
+		// if pending_drops database isn't defined, set it to be the same
+		// database that the migration is on.
+		if mig.PendingDropsDb == "" {
+			mig.PendingDropsDb = mig.Database
+		}
+
 		// only claim the migration if we successfully unstage it
 		urlParams := map[string]string{"id": strconv.Itoa(mig.Id)}
 		_, err := runner.RestClient.Unstage(urlParams)
@@ -452,7 +458,7 @@ func (runner *runner) runMigrationDirectDrop(currentMigration *migration.Migrati
 			return
 		}
 	} else {
-		// rename old table to _pending_drops database instead of actually
+		// rename old table to the pending_drops database instead of actually
 		// dropping it
 		pdTable := migration.TimestampedTable(currentMigration.Table)
 		err = MoveToPendingDrops(currentMigration, currentMigration.Table, pdTable)
@@ -523,7 +529,7 @@ func (runner *runner) runMigrationPtOsc(currentMigration *migration.Migration) (
 // renameTablesStep collects the final table stats for a migration, sends them
 // to the shift api, and moves the migration to the next step.
 func (runner *runner) renameTablesStep(currentMigration *migration.Migration) error {
-	// the next few steps swap the tables and  move the old table to the pending_drops database,
+	// the next few steps swap the tables and move the old table to the pending_drops database,
 	// where a job will drop the table after a certain amount of time (i.e.,
 	// we don't have to worry about it).
 	// do the rename
@@ -536,10 +542,14 @@ func (runner *runner) renameTablesStep(currentMigration *migration.Migration) er
 	if err != nil {
 		return err
 	}
-	// rename old table to _pending_drops database
-	err = MoveToPendingDrops(currentMigration, oldTable, oldTable)
-	if err != nil {
-		return err
+	// rename old table to pending_drops database.
+	// if the pending_drops database is the same as the database for the
+	// migration, skip this step.
+	if currentMigration.Database != currentMigration.PendingDropsDb {
+		err = MoveToPendingDrops(currentMigration, oldTable, oldTable)
+		if err != nil {
+			return err
+		}
 	}
 
 	// get the table stats

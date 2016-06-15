@@ -30,6 +30,7 @@ const (
 	database        = "db1"
 	table           = "t1"
 	stateFile       = "/p/state.txt"
+	pendingDropsDb  = "_pending_drops"
 )
 
 var (
@@ -204,6 +205,7 @@ func initRunner(restClient stubRestClient, logDir, defaultsFile, ptOscPath strin
 	runner.PtOscPath = ptOscPath
 	runner.LogSyncInterval = 1
 	runner.StateSyncInterval = 1
+	runner.PendingDropsDb = pendingDropsDb
 	return runner
 }
 
@@ -337,18 +339,19 @@ var unstageRunnableMigrationTests = []struct {
 		"mode":          float64(migration.TABLE_MODE),
 		"action":        float64(migration.ALTER_ACTION),
 	}, []int{1}, "host", 1, nil, &migration.Migration{
-		Id:           7,
-		Status:       1,
-		Host:         validHost,
-		Port:         port,
-		Database:     database,
-		Table:        table,
-		DdlStatement: validDdl1,
-		FinalInsert:  finalInsert,
-		StateFile:    "id-7/statefile.txt",
-		RunType:      migration.LONG_RUN,
-		Mode:         migration.TABLE_MODE,
-		Action:       migration.ALTER_ACTION,
+		Id:             7,
+		Status:         1,
+		Host:           validHost,
+		Port:           port,
+		Database:       database,
+		Table:          table,
+		DdlStatement:   validDdl1,
+		FinalInsert:    finalInsert,
+		StateFile:      "id-7/statefile.txt",
+		RunType:        migration.LONG_RUN,
+		Mode:           migration.TABLE_MODE,
+		Action:         migration.ALTER_ACTION,
+		PendingDropsDb: pendingDropsDb,
 	}, map[string]string{"id": "7"}},
 	// successfully unstage a migration pinned to this host
 	{map[string]interface{}{
@@ -365,18 +368,19 @@ var unstageRunnableMigrationTests = []struct {
 		"mode":          float64(migration.TABLE_MODE),
 		"action":        float64(migration.ALTER_ACTION),
 	}, []int{1}, "host", 1, nil, &migration.Migration{
-		Id:           7,
-		Status:       1,
-		Host:         validHost,
-		Port:         port,
-		Database:     database,
-		Table:        table,
-		DdlStatement: validDdl1,
-		FinalInsert:  finalInsert,
-		StateFile:    "id-7/statefile.txt",
-		RunType:      migration.NOCHECKALTER_RUN,
-		Mode:         migration.TABLE_MODE,
-		Action:       migration.ALTER_ACTION,
+		Id:             7,
+		Status:         1,
+		Host:           validHost,
+		Port:           port,
+		Database:       database,
+		Table:          table,
+		DdlStatement:   validDdl1,
+		FinalInsert:    finalInsert,
+		StateFile:      "id-7/statefile.txt",
+		RunType:        migration.NOCHECKALTER_RUN,
+		Mode:           migration.TABLE_MODE,
+		Action:         migration.ALTER_ACTION,
+		PendingDropsDb: pendingDropsDb,
 	}, map[string]string{"id": "7"}},
 }
 
@@ -1014,7 +1018,7 @@ func TestRenameTablesStep(t *testing.T) {
 	for _, tt := range renameTablesStepTests {
 		payloadReceived = nil
 		currentRunner := initRunner(stubRestClient{update: tt.update, complete: tt.complete}, "", "", "")
-		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert}
+		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert, Database: "db1"}
 		SwapOscTables = func(*migration.Migration) (string, error) {
 			return "_tablename_new", tt.swapOscTablesError
 		}
