@@ -14,7 +14,7 @@ rest_key:
 # general config
 log_dir: /tmp/shift/
 pt_osc_path: pt-online-schema-change
-pending_drops_db: _pending_drops
+pending_drops_db:
 log_sync_interval: 10
 state_sync_interval: 10
 
