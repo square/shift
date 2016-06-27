@@ -38,6 +38,16 @@ var (
 	payloadReceived map[string]string
 	writePayload    map[string]string
 	appendPayload   []map[string]string
+	ErrStaged       = &rest.RestError{"Staged", errors.New("there was an error")}
+	ErrUnstage      = &rest.RestError{"Unstage", errors.New("there was an error")}
+	ErrNextStep     = &rest.RestError{"NextStep", errors.New("there was an error")}
+	ErrUpdate       = &rest.RestError{"Update", errors.New("there was an error")}
+	ErrComplete     = &rest.RestError{"Complete", errors.New("there was an error")}
+	ErrCancel       = &rest.RestError{"Cancel", errors.New("there was an error")}
+	ErrFail         = &rest.RestError{"Fail", errors.New("there was an error")}
+	ErrError        = &rest.RestError{"Error", errors.New("there was an error")}
+	ErrAppendToFile = &rest.RestError{"AppendToFile", errors.New("there was an error")}
+	ErrWriteFile    = &rest.RestError{"WriteFile", errors.New("there was an error")}
 )
 
 func validTableStatsPayload(id, startOrEnd string) map[string]string {
@@ -72,7 +82,7 @@ func (restClient stubRestClient) Staged() (rest.RestResponseItems, error) {
 		migration := make(map[string]interface{})
 		return []rest.RestResponseItem{migration}, nil
 	} else {
-		return nil, rest.ErrStaged
+		return nil, ErrStaged
 	}
 }
 
@@ -84,7 +94,7 @@ func (restClient stubRestClient) Unstage(params map[string]string) (rest.RestRes
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrUnstage
+		return nil, ErrUnstage
 	}
 }
 
@@ -96,7 +106,7 @@ func (restClient stubRestClient) NextStep(params map[string]string) (rest.RestRe
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrNextStep
+		return nil, ErrNextStep
 	}
 }
 
@@ -108,7 +118,7 @@ func (restClient stubRestClient) Update(params map[string]string) (rest.RestResp
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrUpdate
+		return nil, ErrUpdate
 	}
 }
 
@@ -120,7 +130,7 @@ func (restClient stubRestClient) Complete(params map[string]string) (rest.RestRe
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrComplete
+		return nil, ErrComplete
 	}
 }
 
@@ -132,7 +142,7 @@ func (restClient stubRestClient) Fail(params map[string]string) (rest.RestRespon
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrFail
+		return nil, ErrFail
 	}
 }
 
@@ -144,7 +154,7 @@ func (restClient stubRestClient) Error(params map[string]string) (rest.RestRespo
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrError
+		return nil, ErrError
 	}
 }
 
@@ -156,7 +166,7 @@ func (restClient stubRestClient) Cancel(params map[string]string) (rest.RestResp
 		migration := make(map[string]interface{})
 		return migration, nil
 	} else {
-		return nil, rest.ErrCancel
+		return nil, ErrCancel
 	}
 }
 
@@ -169,7 +179,7 @@ func (restClient stubRestClient) AppendToFile(params map[string]string) (rest.Re
 		shiftFile := make(map[string]interface{})
 		return shiftFile, nil
 	} else {
-		return nil, rest.ErrAppendToFile
+		return nil, ErrAppendToFile
 	}
 }
 
@@ -181,7 +191,7 @@ func (restClient stubRestClient) WriteFile(params map[string]string) (rest.RestR
 		shiftFile := make(map[string]interface{})
 		return shiftFile, nil
 	} else {
-		return nil, rest.ErrWriteFile
+		return nil, ErrWriteFile
 	}
 }
 
@@ -323,7 +333,7 @@ var unstageRunnableMigrationTests = []struct {
 		"runtype":       float64(migration.LONG_RUN),
 		"mode":          float64(migration.TABLE_MODE),
 		"action":        float64(migration.ALTER_ACTION),
-	}, []int{1}, "host", 2, rest.ErrUnstage, nil, map[string]string{"id": "7"}},
+	}, []int{1}, "host", 2, ErrUnstage, nil, map[string]string{"id": "7"}},
 	// successfully unstage a migration not pinned to any host
 	{map[string]interface{}{
 		"status":        float64(1),
@@ -689,10 +699,10 @@ var prepMigrationStepTests = []struct {
 		&validTableStats, nil, nil, migration.ErrQueryFailed, nil, migration.ErrQueryFailed, nil},
 	// fail updating the migration
 	{2, 0, validDdl1, migration.LONG_RUN, migration.TABLE_MODE, migration.ALTER_ACTION,
-		&validTableStats, nil, nil, nil, nil, rest.ErrUpdate, validTableStatsPayload("7", "start")},
+		&validTableStats, nil, nil, nil, nil, ErrUpdate, validTableStatsPayload("7", "start")},
 	// fail moving the migration to the next step
 	{0, 2, validDirectDdl1, migration.SHORT_RUN, migration.TABLE_MODE, migration.CREATE_ACTION,
-		nil, nil, nil, nil, nil, rest.ErrNextStep, map[string]string{"id": "7"}},
+		nil, nil, nil, nil, nil, ErrNextStep, map[string]string{"id": "7"}},
 	// succeeed nocheckalter run
 	{0, 0, validDdl1, migration.NOCHECKALTER_RUN, migration.TABLE_MODE, migration.ALTER_ACTION,
 		&validTableStats, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
@@ -826,7 +836,7 @@ var runMigrationDirectCreateTests = []struct {
 	// fail running the final insert
 	{0, nil, migration.ErrQueryFailed, migration.ErrQueryFailed, nil},
 	// fail completing the migration
-	{2, nil, nil, rest.ErrComplete, map[string]string{"id": "7"}},
+	{2, nil, nil, ErrComplete, map[string]string{"id": "7"}},
 	// succeed
 	{0, nil, nil, nil, map[string]string{"id": "7"}},
 }
@@ -886,7 +896,7 @@ var runMigrationDirectDropTests = []struct {
 	// fail running the final insert
 	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, migration.ErrQueryFailed, migration.ErrQueryFailed, nil},
 	// fail completing the migration
-	{2, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, nil, rest.ErrComplete, map[string]string{"id": "7"}},
+	{2, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
 	// succeed
 	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
 }
@@ -943,17 +953,17 @@ var runMigrationPtOscTests = []struct {
 	expectedPayload map[string]string
 }{
 	// fail updating the migration
-	{false, 2, 0, 0, nil, rest.ErrUpdate, map[string]string{"id": "7", "run_host": "host"}},
+	{false, 2, 0, 0, nil, ErrUpdate, map[string]string{"id": "7", "run_host": "host"}},
 	// fail running pt-osc fail to error out
-	{false, 0, 0, 2, ErrUnexpectedExit, rest.ErrError,
+	{false, 0, 0, 2, ErrUnexpectedExit, ErrError,
 		map[string]string{"id": "7", "error_message": ErrUnexpectedExit.Error()}},
 	// fail running pt-osc error out successfully
 	{false, 0, 0, 0, ErrUnexpectedExit, nil,
 		map[string]string{"id": "7", "error_message": ErrUnexpectedExit.Error()}},
 	// migration not canceled fail moving the migration to the next step
-	{false, 0, 2, 0, nil, rest.ErrNextStep, map[string]string{"id": "7"}},
+	{false, 0, 2, 0, nil, ErrNextStep, map[string]string{"id": "7"}},
 	// migration not canceled success
-	{false, 0, 2, 0, nil, rest.ErrNextStep, map[string]string{"id": "7"}},
+	{false, 0, 2, 0, nil, ErrNextStep, map[string]string{"id": "7"}},
 	// migration canceled success
 	{true, 0, 0, 0, nil, nil, map[string]string{"id": "7", "run_host": "host"}},
 }
@@ -1005,11 +1015,11 @@ var renameTablesStepTests = []struct {
 	// fail getting table stats
 	{0, 0, &validTableStats, nil, migration.ErrQueryFailed, nil, nil, nil, migration.ErrQueryFailed, nil},
 	// fail updating the migration
-	{2, 0, &validTableStats, nil, nil, nil, nil, nil, rest.ErrUpdate, validTableStatsPayload("7", "end")},
+	{2, 0, &validTableStats, nil, nil, nil, nil, nil, ErrUpdate, validTableStatsPayload("7", "end")},
 	// fail running the final insert
 	{0, 0, &validTableStats, nil, nil, migration.ErrQueryFailed, nil, nil, migration.ErrQueryFailed, validTableStatsPayload("7", "end")},
 	// fail to complete the migration
-	{0, 2, &validTableStats, nil, nil, nil, nil, nil, rest.ErrComplete, map[string]string{"id": "7"}},
+	{0, 2, &validTableStats, nil, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
 	// successfully complete the migration
 	{0, 0, &validTableStats, nil, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
 }
@@ -1128,7 +1138,7 @@ var pauseMigrationStepTests = []struct {
 	// fail killing ptosc
 	{ErrPtOscKill, 0, ErrPtOscKill, nil},
 	// fail moving the migration to the next step
-	{nil, 2, rest.ErrNextStep, map[string]string{"id": "7"}},
+	{nil, 2, ErrNextStep, map[string]string{"id": "7"}},
 	// successfully move the migration to the next step
 	{nil, 0, nil, map[string]string{"id": "7"}},
 }
