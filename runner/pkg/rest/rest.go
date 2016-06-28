@@ -11,18 +11,7 @@ import (
 )
 
 var (
-	// define errors
-	ErrStaged        = errors.New("rest: error getting staged migrations")
-	ErrUnstage       = errors.New("rest: error unstaging migration")
-	ErrUnstageStolen = errors.New("rest: another runner picked up the migration before we could unstage it")
-	ErrNextStep      = errors.New("rest: error moving migration to next step")
-	ErrUpdate        = errors.New("rest: error updating migration")
-	ErrComplete      = errors.New("rest: error completing migration")
-	ErrCancel        = errors.New("rest: error canceling migration")
-	ErrFail          = errors.New("rest: error failing migration")
-	ErrError         = errors.New("rest: error error-ing out migration")
-	ErrAppendToFile  = errors.New("rest: error appending to shift file")
-	ErrWriteFile     = errors.New("rest: error writing to shift file")
+	ErrUnstageStolen = errors.New("another runner picked up the migration before we could unstage it")
 )
 
 // restClient contains the http client used to talk to the REST api,
@@ -32,8 +21,17 @@ type restClient struct {
 	api    string
 }
 
+type RestError struct {
+	Op  string
+	Err error
+}
+
 type RestResponseItem map[string]interface{}
 type RestResponseItems []RestResponseItem
+
+func (e *RestError) Error() string {
+	return "RestError [" + e.Op + "]: " + e.Err.Error()
+}
 
 // New initializes a new restClient based on parameters that are
 // passed to it.
@@ -155,7 +153,7 @@ func (restClient *restClient) Staged() (RestResponseItems, error) {
 	resource := "migrations/staged"
 	response, err := restClient.get(resource)
 	if err != nil {
-		return response, ErrStaged
+		return response, &RestError{"Staged", err}
 	}
 	return response, nil
 }
@@ -165,12 +163,12 @@ func (restClient *restClient) Unstage(params map[string]string) (RestResponseIte
 	resource := "migrations/unstage"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrUnstage
+		return nil, &RestError{"Unstage", err}
 	}
 	if _, ok := response["id"]; ok {
 		return response, nil
 	} else {
-		return nil, ErrUnstageStolen
+		return nil, &RestError{"Unstage", ErrUnstageStolen}
 	}
 }
 
@@ -179,7 +177,7 @@ func (restClient *restClient) NextStep(params map[string]string) (RestResponseIt
 	resource := "migrations/next_step"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrNextStep
+		return nil, &RestError{"NextStep", err}
 	}
 	return response, nil
 }
@@ -189,7 +187,7 @@ func (restClient *restClient) Update(params map[string]string) (RestResponseItem
 	resource := "migrations"
 	response, err := restClient.put(resource, params)
 	if err != nil {
-		return nil, ErrUpdate
+		return nil, &RestError{"Update", err}
 	}
 	return response, nil
 }
@@ -199,7 +197,7 @@ func (restClient *restClient) Complete(params map[string]string) (RestResponseIt
 	resource := "migrations/complete"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrComplete
+		return nil, &RestError{"Complete", err}
 	}
 	return response, nil
 }
@@ -209,7 +207,7 @@ func (restClient *restClient) Cancel(params map[string]string) (RestResponseItem
 	resource := "migrations/cancel"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrCancel
+		return nil, &RestError{"Cancel", err}
 	}
 	return response, nil
 }
@@ -219,7 +217,7 @@ func (restClient *restClient) Fail(params map[string]string) (RestResponseItem, 
 	resource := "migrations/fail"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrFail
+		return nil, &RestError{"Fail", err}
 	}
 	return response, nil
 }
@@ -229,7 +227,7 @@ func (restClient *restClient) Error(params map[string]string) (RestResponseItem,
 	resource := "migrations/error"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrError
+		return nil, &RestError{"Error", err}
 	}
 	return response, nil
 }
@@ -239,7 +237,7 @@ func (restClient *restClient) AppendToFile(params map[string]string) (RestRespon
 	resource := "migrations/append_to_file"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrAppendToFile
+		return nil, &RestError{"AppendToFile", err}
 	}
 	return response, nil
 }
@@ -249,7 +247,7 @@ func (restClient *restClient) WriteFile(params map[string]string) (RestResponseI
 	resource := "migrations/write_file"
 	response, err := restClient.post(resource, params)
 	if err != nil {
-		return nil, ErrWriteFile
+		return nil, &RestError{"WriteFile", err}
 	}
 	return response, nil
 }
