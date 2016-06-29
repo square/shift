@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"os/exec"
 	"regexp"
@@ -36,9 +37,13 @@ var (
 	statusesToRun = []int{migration.PrepMigrationStatus, migration.RunMigrationStatus,
 		migration.RenameTablesStatus, migration.CancelStatus, migration.PauseStatus}
 	// track pt-osc execs, which may need to be canceled/killed
-	runningMigrations = map[int]int{} // {id: pid}
-	runningMigMutex   = &sync.Mutex{}
-	ptOscKillSignal   = syscall.SIGKILL
+	runningMigrations           = map[int]int{} // {id: pid}
+	runningMigMutex             = &sync.Mutex{}
+	ptOscKillSignal             = syscall.SIGKILL
+	canPickupMigrations         = false
+	unstageMigrationMutex       = &sync.Mutex{}
+	fileSyncWaitGroup           sync.WaitGroup
+	unstagedMigrationsWaitGroup sync.WaitGroup
 
 	// runner methods
 	failMigration            = (*runner).failMigration
@@ -51,8 +56,9 @@ var (
 	pauseMigrationStep       = (*runner).pauseMigrationStep
 	unstageRunnableMigration = (*runner).unstageRunnableMigration
 	execPtOsc                = (*runner).execPtOsc
-	killMig                  = killMigration
+	killMigration            = (*runner).killMigration
 	killPtOsc                = killPtOscProcess
+	killPtOscById            = killPtOscProcessById
 
 	// migration methods
 	SetupDbClient       = (*migration.Migration).SetupDbClient
@@ -68,6 +74,8 @@ var (
 
 	// define errors
 	ErrInvalidMigration = errors.New("runner: invalid migration")
+	ErrNotRunning       = errors.New("runner: can't pause or cancel migration that's not running on this host")
+	ErrFiles            = errors.New("runner: error creating and retrieving files")
 	ErrPtOscExec        = errors.New("runner: error exec-ing pt-osc")
 	ErrPtOscKill        = errors.New("runner: error killing pt-osc")
 	ErrPtOscCleanUp     = errors.New("runner: error cleaning up after pt-osc (the process was killed though)")
@@ -94,8 +102,9 @@ type runner struct {
 	PortOverride      int    `yaml:"port_override"`
 	DatabaseOverride  string `yaml:"database_override"`
 	Hostname          string
-	LogSyncInterval   int `yaml:"log_sync_interval"`
-	StateSyncInterval int `yaml:"state_sync_interval"`
+	LogSyncInterval   int    `yaml:"log_sync_interval"`
+	StateSyncInterval int    `yaml:"state_sync_interval"`
+	StopFilePath      string `yaml:"stop_file_path"`
 }
 
 type TableStats struct {
@@ -159,15 +168,64 @@ func newRunner(configFile string) (*runner, error) {
 }
 
 // collect and unstage new migrations, and pass them through the job channel.
-// loop every 30 seconds.
+// loop every 10-20 seconds.
 func (runner *runner) sendRunnableMigrationsToProcessor(jobChannel chan *migration.Migration) {
 	for {
-		newMigrations := runner.getRunnableMigrations()
-		for i := range newMigrations {
-			// Pass each new, unstaged migration through the job channel.
-			jobChannel <- newMigrations[i]
+		unstageMigrationMutex.Lock()
+		if canPickupMigrations {
+			newMigrations := runner.getRunnableMigrations()
+			for i := range newMigrations {
+				// Pass each new, unstaged migration through the job channel.
+				unstagedMigrationsWaitGroup.Add(1)
+				jobChannel <- newMigrations[i]
+			}
 		}
-		time.Sleep(10 * time.Second)
+		unstageMigrationMutex.Unlock()
+
+		// random sleep time to help load balance
+		time.Sleep(time.Duration(rand.Intn(10)+10) * time.Second)
+	}
+}
+
+// watchForStopFile watches for the existence of a stop file. Will kill and offer up migrations if found
+// loop every 1 seconds
+func (runner *runner) watchForStopFile() {
+	for {
+		if _, err := os.Stat(runner.StopFilePath); err == nil {
+			glog.Infof("Stop file found (%s), killing...", runner.StopFilePath)
+			unstageMigrationMutex.Lock()
+			canPickupMigrations = false
+			unstagedMigrationsWaitGroup.Wait()
+			unstageMigrationMutex.Unlock()
+			runner.killAndOfferMigrations()
+		} else {
+			canPickupMigrations = true
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// Kills the ptosc job and sends migration through api to be picked up by other hosts
+func (runner *runner) killAndOfferMigrations() {
+	if len(runningMigrations) > 0 {
+		killedMigrations := killAllPtOscProcesses()
+
+		glog.Infof("Done killing, waiting for file sync gorountines to finish")
+
+		fileSyncWaitGroup.Wait() // wait for all file syncing goroutines to finish
+
+		glog.Infof("All file syncing gorountines are finished, proceeding...")
+
+		for _, migrationId := range killedMigrations {
+			glog.Infof("Offering migration mig_id=%v", migrationId)
+			urlParams := map[string]string{"id": strconv.Itoa(migrationId)}
+			_, err := runner.RestClient.Offer(urlParams)
+			if err != nil {
+				glog.Error(err)
+			}
+		}
+
+		glog.Infof("Offered all killed migrations")
 	}
 }
 
@@ -227,12 +285,14 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			if pinnedHostname != runner.Hostname {
 				glog.Errorf("mig_id=%d: migration already pinned to %s. Skipping.",
 					migrationIdField, pinnedHostname)
-				return nil, nil
+				return nil, ErrNotRunning
 			}
 		}
 
-		// statefiles are stored in log directory. ex for mig with id 7: /path/to/logs/statefile-id-7.txt
-		stateFile := runner.LogDir + "id-" + strconv.Itoa(int(migrationIdField)) + "/statefile.txt"
+		// log and statefiles are stored in log directory. ex for mig with id 7: /path/to/logs/statefile-id-7.txt
+		filesDir := runner.LogDir + "id-" + strconv.Itoa(int(migrationIdField)) + "/"
+		stateFile := filesDir + "statefile.txt"
+		logFile := filesDir + "ptosc-output.log"
 
 		mig := &migration.Migration{
 			Id:             migrationIdField,
@@ -243,7 +303,9 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			Table:          currentMigration["table"].(string),
 			DdlStatement:   currentMigration["ddl_statement"].(string),
 			FinalInsert:    currentMigration["final_insert"].(string),
+			FilesDir:       filesDir,
 			StateFile:      stateFile,
+			LogFile:        logFile,
 			PendingDropsDb: runner.PendingDropsDb,
 		}
 
@@ -307,6 +369,12 @@ func (runner *runner) failMigration(migration *migration.Migration, errorMsg str
 func (runner *runner) processMigration(currentMigration *migration.Migration) {
 	glog.Infof("mig_id=%d: Picked up migration from the job channel. Processing.", currentMigration.Id)
 
+	if currentMigration.Status != migration.RunMigrationStatus {
+		// excludes RunMigrationStatus because we want to .Done those after
+		// we start PtOsc
+		defer unstagedMigrationsWaitGroup.Done()
+	}
+
 	// setup a database client for the migration
 	err := SetupDbClient(currentMigration, runner.MysqlUser, runner.MysqlPassword,
 		maybeReplaceHostname(runner.MysqlCert), maybeReplaceHostname(runner.MysqlKey),
@@ -329,7 +397,7 @@ func (runner *runner) processMigration(currentMigration *migration.Migration) {
 	case migration.PauseStatus:
 		err = pauseMigrationStep(runner, currentMigration)
 	case migration.CancelStatus:
-		err = killMig(currentMigration)
+		err = killMigration(runner, currentMigration)
 	default:
 		err = ErrUnkownStatus
 	}
@@ -355,7 +423,7 @@ func (runner *runner) prepMigrationStep(currentMigration *migration.Migration) e
 		// run a dry-run of pt-osc and make sure there were no errors.
 		// this will also validate the ddl statement.
 		var copyPercentChan chan int
-		_, err := execPtOsc(runner, currentMigration, runner.generatePtOscCommand, copyPercentChan)
+		_, err := execPtOsc(runner, currentMigration, runner.generatePtOscCommand, copyPercentChan, true)
 		if err != nil {
 			return err
 		}
@@ -404,6 +472,7 @@ func (runner *runner) prepMigrationStep(currentMigration *migration.Migration) e
 // either runs it directly against the database, or with the ptosc tool
 func (runner *runner) runMigrationStep(currentMigration *migration.Migration) (err error) {
 	if currentMigration.RunType == migration.SHORT_RUN {
+		defer unstagedMigrationsWaitGroup.Done()
 		if currentMigration.Action == migration.DROP_ACTION {
 			return runMigrationDirectDrop(runner, currentMigration)
 		} else {
@@ -412,7 +481,6 @@ func (runner *runner) runMigrationStep(currentMigration *migration.Migration) (e
 	} else {
 		return runMigrationPtOsc(runner, currentMigration)
 	}
-	return
 }
 
 // runMigrationDirect runs a migration query directly against the database.
@@ -495,11 +563,14 @@ func (runner *runner) runMigrationPtOsc(currentMigration *migration.Migration) (
 	}
 	_, err = runner.RestClient.Update(urlParams)
 	if err != nil {
+		unstagedMigrationsWaitGroup.Done()
 		return
 	}
 
+	defer runner.RestClient.UnpinRunHost(map[string]string{"id": migrationId})
+
 	copyPercentChan := make(chan int)
-	canceled, err := execPtOsc(runner, currentMigration, runner.generatePtOscCommand, copyPercentChan)
+	canceled, err := execPtOsc(runner, currentMigration, runner.generatePtOscCommand, copyPercentChan, false)
 	if err != nil {
 		// if pt-osc ran into an error, move the migration to the "error" step instead
 		// of failing it. from the "error" step we will have the ability to try and
@@ -529,6 +600,12 @@ func (runner *runner) runMigrationPtOsc(currentMigration *migration.Migration) (
 // renameTablesStep collects the final table stats for a migration, sends them
 // to the shift api, and moves the migration to the next step.
 func (runner *runner) renameTablesStep(currentMigration *migration.Migration) error {
+	// get the lastest state file
+	err := runner.createAndRetrieveFiles(currentMigration)
+	if err != nil {
+		return err
+	}
+
 	// the next few steps swap the tables and move the old table to the pending_drops database,
 	// where a job will drop the table after a certain amount of time (i.e.,
 	// we don't have to worry about it).
@@ -589,12 +666,10 @@ func killPtOscProcess(currentMigration *migration.Migration) error {
 	runningMigMutex.Lock()
 	defer runningMigMutex.Unlock()
 	// kill pt-osc if it's running on this host
-	if pid, exists := runningMigrations[currentMigration.Id]; exists {
-		glog.Infof("mig_id=%d: killing (pid = %d).", currentMigration.Id, pid)
-		err := syscall.Kill(pid, ptOscKillSignal)
+	if _, exists := runningMigrations[currentMigration.Id]; exists {
+		err := killPtOscProcessById(currentMigration.Id)
 		if err != nil {
-			glog.Errorf("mig_id=%d: error killing pt-osc (error: %s)", currentMigration.Id, err)
-			return ErrPtOscKill
+			return err
 		}
 
 		delete(runningMigrations, currentMigration.Id)
@@ -602,6 +677,39 @@ func killPtOscProcess(currentMigration *migration.Migration) error {
 		glog.Infof("mig_id=%d: can't kill because it's not running.", currentMigration.Id)
 	}
 
+	return nil
+}
+
+// killAllPtOscProcesses sends a SIGKILL to all pt-osc proccess associated
+// with running migrations, and returns a list of migration ids of killed processes
+func killAllPtOscProcesses() []int {
+	killedMigrations := make([]int, 0)
+	runningMigMutex.Lock()
+	defer runningMigMutex.Unlock()
+	for migrationId, _ := range runningMigrations {
+		err := killPtOscById(migrationId)
+		delete(runningMigrations, migrationId)
+		if err != nil {
+			glog.Error(err)
+			continue
+		}
+		killedMigrations = append(killedMigrations, migrationId)
+	}
+	return killedMigrations
+}
+
+// killPtOscProcess sends a SIGKILL to the pt-osc process associated
+// with the migrationId, does not lock runningMigMutex
+func killPtOscProcessById(migrationId int) error {
+	pid := runningMigrations[migrationId]
+	glog.Infof("mig_id=%d: killing (pid = %d).", migrationId, pid)
+	err := syscall.Kill(pid, ptOscKillSignal)
+	if err != nil {
+		glog.Errorf("mig_id=%d: error killing pt-osc (error: %s)", migrationId, err)
+		return ErrPtOscKill
+	}
+
+	delete(runningMigrations, migrationId)
 	return nil
 }
 
@@ -613,6 +721,8 @@ func (runner *runner) pauseMigrationStep(currentMigration *migration.Migration) 
 		return err
 	}
 
+	runner.postStateFile(currentMigration)
+
 	// move the migration to the next step
 	urlParams := map[string]string{"id": strconv.Itoa(currentMigration.Id)}
 	_, err = runner.RestClient.NextStep(urlParams)
@@ -623,8 +733,13 @@ func (runner *runner) pauseMigrationStep(currentMigration *migration.Migration) 
 }
 
 // killMigration kills pt-osc and cleans up after a migration
-func killMigration(currentMigration *migration.Migration) error {
+func (runner *runner) killMigration(currentMigration *migration.Migration) error {
 	err := killPtOsc(currentMigration)
+	if err != nil {
+		return err
+	}
+
+	err = runner.createAndRetrieveFiles(currentMigration)
 	if err != nil {
 		return err
 	}
@@ -663,6 +778,7 @@ type writeToWriter func(*bufio.Writer, string, time.Time) error
 // Also writes to a buffer which is POSTed to append_to_file when a new log line appears
 // after LogSyncInterval seconds
 func (runner *runner) writeToPtOscLog(ptOscLogWriter *bufio.Writer, ptOscLogChan chan string, writerFunc writeToWriter, migrationId int, waitGroup *sync.WaitGroup) {
+	defer fileSyncWaitGroup.Done()
 	defer waitGroup.Done()
 	var buffer bytes.Buffer
 	lastPostTime := time.Unix(0, 0)
@@ -685,7 +801,7 @@ func (runner *runner) writeToPtOscLog(ptOscLogWriter *bufio.Writer, ptOscLogChan
 			}
 		}
 	}
-
+	glog.Infof("Stopped syncing log file")
 	runner.postLogToFileApi(&buffer, migrationId)
 }
 
@@ -717,16 +833,22 @@ func writeLineToPtOscLog(ptOscLogWriter *bufio.Writer, logMsg string, currentTim
 
 // syncStateFile periodically reads a migration's statefile and sends it to the api
 func (runner *runner) syncStateFile(migration *migration.Migration, quit chan string, waitGroup *sync.WaitGroup) {
+	defer fileSyncWaitGroup.Done()
 	defer waitGroup.Done()
+	lastPostTime := time.Unix(0, 0)
 	for {
+		currentTime := time.Now().Local()
 		select {
 		case <-quit:
 			glog.Infof("Stopped syncing state file")
 			runner.postStateFile(migration)
 			return
 		default:
-			runner.postStateFile(migration)
-			time.Sleep(time.Duration(runner.StateSyncInterval) * time.Second)
+			if int(currentTime.Sub(lastPostTime)/time.Second) >= runner.StateSyncInterval {
+				lastPostTime = currentTime
+				runner.postStateFile(migration)
+			}
+			time.Sleep(1 * time.Second)
 		}
 	}
 }
@@ -787,31 +909,60 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 	return
 }
 
-// execPtOsc shells out and uses pt-osc to actually run a migration.
-func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOptionGenerator commandOptionGenerator, copyPercentChan chan int) (bool, error) {
-	canceled := false
-
-	var waitGroup sync.WaitGroup
-
-	// create a file and writer for logging pt-osc output
-	ptOscLogFileDir := runner.LogDir + "id-" + strconv.Itoa(currentMigration.Id)
-	if _, err := os.Stat(ptOscLogFileDir); err != nil {
+// createAndRetrieveFiles attempts to create a migration's state file,
+// if it does not exist, and retrieve the latest version from the api
+func (runner *runner) createAndRetrieveFiles(currentMigration *migration.Migration) error {
+	if _, err := os.Stat(currentMigration.FilesDir); err != nil {
 		if os.IsNotExist(err) {
-			err := os.Mkdir(ptOscLogFileDir, 0777)
+			err := os.Mkdir(currentMigration.FilesDir, 0777)
 			if err != nil {
-				glog.Errorf("mig_id=%d: error creating pt-osc log directory '%s' (error: %s)", currentMigration.Id, ptOscLogFileDir, err)
-				return canceled, ErrPtOscExec
+				glog.Errorf("mig_id=%d: error creating pt-osc log directory '%s' (error: %s)", currentMigration.Id, currentMigration.FilesDir, err)
+				return ErrFiles
 			}
 		} else {
-			glog.Errorf("mig_id=%d: error stat-ing pt-osc log directory '%s' (error: %s)", currentMigration.Id, ptOscLogFileDir, err)
-			return canceled, ErrPtOscExec
+			glog.Errorf("mig_id=%d: error stat-ing pt-osc log directory '%s' (error: %s)", currentMigration.Id, currentMigration.FilesDir, err)
+			return ErrFiles
 		}
 	}
 
-	ptOscLogFilePath := ptOscLogFileDir + "/ptosc-output.log"
-	ptOscLogFile, ptOscLogWriter, err := setupLogWriter(ptOscLogFilePath)
+	// try to retrieve a statefile from the api
+	urlParams := map[string]string{
+		"migration_id": strconv.Itoa(currentMigration.Id),
+		"file_type":    STATE_FILE_TYPE,
+	}
+	stateFile, restErr := runner.RestClient.GetFile(urlParams)
+	if restErr == nil && stateFile["contents"] != nil && len(stateFile["contents"].(string)) > 0 {
+		err := currentMigration.WriteStateFile([]byte(stateFile["contents"].(string)))
+		if err != nil {
+			glog.Errorf("mig_id=%d: error writing to statefile '%s' (error: %s)", currentMigration.Id, currentMigration.StateFile, err)
+			return ErrFiles
+		}
+	}
+	return nil
+}
+
+// execPtOsc shells out and uses pt-osc to actually run a migration.
+func (runner *runner) execPtOsc(currentMigration *migration.Migration,
+	ptOscOptionGenerator commandOptionGenerator, copyPercentChan chan int, unstageDone bool) (bool, error) {
+
+	// unstageDone = whether or not unstagedMigrationsWaitGroup has already had .Done() called on it
+	defer func() {
+		if !unstageDone {
+			unstagedMigrationsWaitGroup.Done()
+		}
+	}()
+	canceled := false
+
+	var fileRoutineWaitGroup sync.WaitGroup
+
+	err := runner.createAndRetrieveFiles(currentMigration)
 	if err != nil {
-		glog.Errorf("mig_id=%d: error creating pt-osc log file '%s' (error: %s)", currentMigration.Id, ptOscLogFilePath, err)
+		return canceled, err
+	}
+
+	ptOscLogFile, ptOscLogWriter, err := setupLogWriter(currentMigration.LogFile)
+	if err != nil {
+		glog.Errorf("mig_id=%d: error creating pt-osc log file '%s' (error: %s)", currentMigration.Id, currentMigration.LogFile, err)
 		return canceled, ErrPtOscExec
 	}
 	defer ptOscLogFile.Close()
@@ -841,13 +992,15 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 
 	// setup a channel and goroutine for logging output of stdout/stderr
 	ptOscLogChan := make(chan string)
-	waitGroup.Add(1)
-	go runner.writeToPtOscLog(ptOscLogWriter, ptOscLogChan, writeLineToPtOscLog, currentMigration.Id, &waitGroup)
+	fileRoutineWaitGroup.Add(1)
+	fileSyncWaitGroup.Add(1)
+	go runner.writeToPtOscLog(ptOscLogWriter, ptOscLogChan, writeLineToPtOscLog, currentMigration.Id, &fileRoutineWaitGroup)
 
 	// setup a goroutine for sending statefiles to the api
 	ptOscStateFileChan := make(chan string)
-	waitGroup.Add(1)
-	go runner.syncStateFile(currentMigration, ptOscStateFileChan, &waitGroup)
+	fileRoutineWaitGroup.Add(1)
+	fileSyncWaitGroup.Add(1)
+	go runner.syncStateFile(currentMigration, ptOscStateFileChan, &fileRoutineWaitGroup)
 
 	// setup goroutines for watching stdout/stderr of the command
 	stdoutErrChan := make(chan error)
@@ -855,8 +1008,9 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 	go currentMigration.WatchMigrationStdout(stdout, stdoutErrChan, ptOscLogChan)
 	if currentMigration.Status == migration.RunMigrationStatus {
 		// setup a goroutine to continually update the % copied of the migration
-		waitGroup.Add(1)
-		go runner.updateMigrationCopyPercentage(currentMigration, copyPercentChan, &waitGroup)
+		fileRoutineWaitGroup.Add(1)
+		fileSyncWaitGroup.Add(1)
+		go runner.updateMigrationCopyPercentage(currentMigration, copyPercentChan, &fileRoutineWaitGroup)
 		go currentMigration.WatchMigrationCopyStderr(stderr, copyPercentChan, stderrErrChan, ptOscLogChan)
 	} else {
 		go currentMigration.WatchMigrationStderr(stderr, stderrErrChan, ptOscLogChan)
@@ -870,12 +1024,21 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 	runningMigMutex.Lock()
 	runningMigrations[currentMigration.Id] = currentMigration.Pid
 	runningMigMutex.Unlock()
+	if !unstageDone {
+		unstageDone = true
+		unstagedMigrationsWaitGroup.Done()
+	}
 
 	// wait for both stdout and stderr error channels to receive a signal
 	stdoutErr := <-stdoutErrChan
 	stderrErr := <-stderrErrChan
 	close(ptOscLogChan)
 	close(ptOscStateFileChan)
+
+	// remove the migration id from the running migration map
+	runningMigMutex.Lock()
+	delete(runningMigrations, currentMigration.Id)
+	runningMigMutex.Unlock()
 
 	// get the exit status of the command. if it was sent a SIGKILL (most likely
 	// by another goroutine) we want to know because we will treat it differently
@@ -905,15 +1068,11 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 	}
 
 	if copyPercentChan != nil {
+		glog.Infof("Closing copy percent channel")
 		close(copyPercentChan)
 	}
 
-	waitGroup.Wait() // wait for go routines to finish
-
-	// remove the migration id from the running migration map
-	runningMigMutex.Lock()
-	delete(runningMigrations, currentMigration.Id)
-	runningMigMutex.Unlock()
+	fileRoutineWaitGroup.Wait() // wait for go routines to finish
 
 	// favor returning error from unexpected failure, then error from stderr,
 	// and lastly error from stdout
@@ -931,6 +1090,7 @@ func (runner *runner) execPtOsc(currentMigration *migration.Migration, ptOscOpti
 // updateMigrationCopyPercentage watches a channel for a running migration and
 // sends the copy percentage completed (from the channel) to the shift api
 func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.Migration, copyPercentChan chan int, waitGroup *sync.WaitGroup) {
+	defer fileSyncWaitGroup.Done()
 	defer waitGroup.Done()
 	migrationId := strconv.Itoa(currentMigration.Id)
 	for copyPercentage := range copyPercentChan {
@@ -954,6 +1114,8 @@ func Start(configFile string) error {
 	}
 
 	jobChannel := make(chan *migration.Migration)
+
+	go migrationRunner.watchForStopFile()
 
 	go migrationRunner.sendRunnableMigrationsToProcessor(jobChannel)
 

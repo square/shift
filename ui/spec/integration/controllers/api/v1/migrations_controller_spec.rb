@@ -393,6 +393,47 @@ RSpec.describe Api::V1::MigrationsController, type: :controller do
     end
   end
 
+  describe 'POST #offer' do
+    before (:each) do
+      @migration = FactoryGirl.create(:copy_migration, cluster_name: @cluster.name)
+      post :offer, id: @migration.id
+      @migration.reload
+    end
+
+    it 'puts migration in staged and copy_in_progress' do
+      expect(@migration[:staged]).to eq(true)
+      expect(@migration[:status]).to eq(Migration.status_groups[:copy_in_progress])
+    end
+
+    it 'returns migration as json' do
+      expect(json["id"]).to eq(@migration["id"])
+    end
+
+    it 'returns a 200 status code' do
+      expect(response).to have_http_status(200)
+    end
+  end
+
+  describe 'POST #unpin_run_host' do
+    before (:each) do
+      @migration = FactoryGirl.create(:migration, run_host: "host")
+      post :unpin_run_host, id: @migration.id
+      @migration.reload
+    end
+
+    it 'puts makes the migrations\'s run_host nil' do
+      expect(@migration[:run_host]).to be_nil
+    end
+
+    it 'returns migration as json' do
+      expect(json["id"]).to eq(@migration["id"])
+    end
+
+    it 'returns a 200 status code' do
+      expect(response).to have_http_status(200)
+    end
+  end
+
   describe 'POST #append_to_file' do
     before (:each) do
       @log_type = ShiftFile.file_types[:log]
@@ -452,6 +493,29 @@ RSpec.describe Api::V1::MigrationsController, type: :controller do
     it 'errors when file type is not writable' do
       post :write_file, migration_id: 123, file_type: ShiftFile.file_types[:log], contents: "test content"
       expect(response).to have_http_status(400)
+    end
+  end
+
+  describe 'GET #get_file' do
+    before (:each) do
+      FactoryGirl.create(:shift_file, migration_id: 123, file_type: 1, contents: "test content")
+    end
+
+    it 'returns file as json' do
+      get :get_file, migration_id: 123, file_type: 1
+      expect(json["migration_id"]).to eq(123)
+      expect(json["file_type"]).to eq(1)
+      expect(json["contents"]).to eq("test content")
+    end
+
+    it 'returns a 200 status code' do
+      get :get_file, migration_id: 123, file_type: 1
+      expect(response).to have_http_status(200)
+    end
+
+    it 'returns a 404 status code when file cannot be found' do
+      get :get_file, migration_id: 999, file_type: 1
+      expect(response).to have_http_status(404)
     end
   end
 end

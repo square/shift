@@ -59,6 +59,7 @@ Here are the configuration files that you will probably want to update (although
   * `pending_drops_db`: the name of the pending drops (trash can) db. If this isn't specified, old tables won't be renamed out of their original database
   * `log_sync_interval`: interval in seconds for uploading pt-osc log files to the ui
   * `state_sync_interval`: same as above, but for pt-osc state files
+  * `stop_file_path`: path to a file, which if it exists, will send the runner into a stopped state where it will no longer process migrations.
   * `host_override`: if you specify a host here, it will override the host for all migrations exposed by the shift api. This is useful for a staging environment when you want to make sure you don't accidentally run migrations on live dbs
   * `port_override`: same as above, but for a port
   * `database_override`: same as above, but for a database

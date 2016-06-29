@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -68,24 +69,27 @@ func New(api, cert, key string) (*restClient, error) {
 }
 
 // get makes an http "GET" request with restClient.
-func (restClient *restClient) get(resource string) (RestResponseItems, error) {
+func (restClient *restClient) get(resource string, params map[string]string, responseStruct interface{}) error {
 	client := restClient.Client
 	api := restClient.api
-	url := api + resource
+	values := url.Values{}
+	for k, v := range params {
+		values.Add(k, v)
+	}
+	url := api + resource + "?" + values.Encode()
 
 	resp, err := client.Get(url)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer resp.Body.Close()
 
 	// Parse the response into JSON
 	decoder := json.NewDecoder(resp.Body)
-	var response RestResponseItems
-	if err = decoder.Decode(&response); err != nil {
-		return nil, err
+	if err = decoder.Decode(&responseStruct); err != nil {
+		return err
 	}
-	return response, nil
+	return nil
 }
 
 // post makes an http "POST" request with restClient.
@@ -151,7 +155,8 @@ func (restClient *restClient) put(resource string, urlParams map[string]string) 
 // Staged gets an array of staged migrations.
 func (restClient *restClient) Staged() (RestResponseItems, error) {
 	resource := "migrations/staged"
-	response, err := restClient.get(resource)
+	response := RestResponseItems{}
+	err := restClient.get(resource, nil, &response)
 	if err != nil {
 		return response, &RestError{"Staged", err}
 	}
@@ -232,6 +237,26 @@ func (restClient *restClient) Error(params map[string]string) (RestResponseItem,
 	return response, nil
 }
 
+// Offer offers migration up to be run on another host
+func (restClient *restClient) Offer(params map[string]string) (RestResponseItem, error) {
+	resource := "migrations/offer"
+	response, err := restClient.post(resource, params)
+	if err != nil {
+		return nil, &RestError{"Offer", err}
+	}
+	return response, nil
+}
+
+// UnpinRunHost unpins a migration from this host
+func (restClient *restClient) UnpinRunHost(params map[string]string) (RestResponseItem, error) {
+	resource := "migrations/unpin_run_host"
+	response, err := restClient.post(resource, params)
+	if err != nil {
+		return nil, &RestError{"UnpinRunHost", err}
+	}
+	return response, nil
+}
+
 // AppendToFile appends some lines to a shift file
 func (restClient *restClient) AppendToFile(params map[string]string) (RestResponseItem, error) {
 	resource := "migrations/append_to_file"
@@ -248,6 +273,17 @@ func (restClient *restClient) WriteFile(params map[string]string) (RestResponseI
 	response, err := restClient.post(resource, params)
 	if err != nil {
 		return nil, &RestError{"WriteFile", err}
+	}
+	return response, nil
+}
+
+// GetFile gets a shift file
+func (restClient *restClient) GetFile(params map[string]string) (RestResponseItem, error) {
+	resource := "migrations/get_file"
+	response := RestResponseItem{}
+	err := restClient.get(resource, params, &response)
+	if err != nil {
+		return nil, &RestError{"GetFile", err}
 	}
 	return response, nil
 }

@@ -62,9 +62,12 @@ func initMigrationsJson() {
 		http.HandleFunc("/api/v1/migrations/next_step", httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/complete", httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/cancel", httpJsonHandler)
+		http.HandleFunc("/api/v1/migrations/offer", httpJsonHandler)
+		http.HandleFunc("/api/v1/migrations/unpin_run_host", httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/"+testMigId, httpJsonHandler)
 		http.HandleFunc("/api/v1/migrations/append_to_file", httpJsonHandlerShiftFile)
 		http.HandleFunc("/api/v1/migrations/write_file", httpJsonHandlerShiftFile)
+		http.HandleFunc("/api/v1/migrations/get_file", httpJsonHandlerShiftFile)
 		// stolen migrations
 		http.HandleFunc("/api/v1/stolen/migrations/unstage", httpJsonHandlerStolen)
 		http.ListenAndServe("localhost:12345", nil)
@@ -357,6 +360,54 @@ func TestErrorMigration(t *testing.T) {
 	}
 }
 
+func TestOfferMigration(t *testing.T) {
+	initMigrationsJson()
+
+	client, err := New("http://localhost:12345/api/v1/", "", "")
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	urlParams := make(map[string]string)
+	urlParams["id"] = testMigId
+	response, err := client.Offer(urlParams)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expectedMigration := initMigration()
+	for k, v := range response {
+		actual := v
+		expected := expectedMigration[k]
+		if expected != actual {
+			t.Errorf("response = %v, want %v", actual, expected)
+		}
+	}
+}
+
+func TestUnpinRunHost(t *testing.T) {
+	initMigrationsJson()
+
+	client, err := New("http://localhost:12345/api/v1/", "", "")
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	urlParams := make(map[string]string)
+	urlParams["id"] = testMigId
+	response, err := client.UnpinRunHost(urlParams)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expectedMigration := initMigration()
+	for k, v := range response {
+		actual := v
+		expected := expectedMigration[k]
+		if expected != actual {
+			t.Errorf("response = %v, want %v", actual, expected)
+		}
+	}
+}
+
 func TestAppendToFile(t *testing.T) {
 	initMigrationsJson()
 
@@ -395,6 +446,31 @@ func TestWriteFile(t *testing.T) {
 	urlParams["file_type"] = "0"
 	urlParams["contents"] = "test content"
 	response, err := client.WriteFile(urlParams)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expectedShiftFile := initShiftFile()
+	for k, v := range response {
+		actual := v
+		expected := expectedShiftFile[k]
+		if expected != actual {
+			t.Errorf("response = %v, want %v", actual, expected)
+		}
+	}
+}
+
+func TestGetFile(t *testing.T) {
+	initMigrationsJson()
+
+	client, err := New("http://localhost:12345/api/v1/", "", "")
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+	urlParams := make(map[string]string)
+	urlParams["migration_id"] = testMigId
+	urlParams["file_type"] = "1"
+	response, err := client.GetFile(urlParams)
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}

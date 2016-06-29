@@ -56,8 +56,11 @@ Rails.application.routes.draw do
           post 'cancel'
           post 'fail'
           post 'error'
+          post 'offer'
+          post 'unpin_run_host'
           post 'append_to_file'
           post 'write_file'
+          get 'get_file'
         end
       end
       resources :migrations, :only => [:show, :update]
