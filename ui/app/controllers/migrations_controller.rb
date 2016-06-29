@@ -154,9 +154,10 @@ class MigrationsController < ApplicationController
     @migration = Migration.find(params[:id])
     authorize @migration, :approve?
 
-    # don't let user decide if maybeshort should be a short run unless they can approve
-    # dangerous things. also don't let them decide nocheck-alter
-    if (params[:runtype].to_i == Migration.types[:run][:short] && @migration.parsed[:run] == :maybeshort)
+    # don't let user decide if maybeshort should be a short run unless the table is really
+    # small or they can approve dangerous things. also don't let them decide nocheck-alter
+    if (params[:runtype].to_i == Migration.types[:run][:short] &&
+        (@migration.parsed[:run] == :maybeshort && !@migration.small_enough_for_short_run?))
       authorize @migration, :approve_dangerous?
     end
     if (params[:runtype].to_i == Migration.types[:run][:nocheckalter] && @migration.parsed[:run] == :maybenocheckalter)
