@@ -48,14 +48,19 @@ function validateDdl(id) {
     });
 }
 
+function dropIndexInDdl(id) {
+    var ddl = $('[id$=' + id + ']').val();
+    return /drop index/i.test(ddl);
+}
+
 function uniqueInDdl(id) {
     var ddl = $('[id$=' + id + ']').val();
-    return /unique/i.test(ddl)
+    return /unique/i.test(ddl);
 }
 
 function columnsChangedInDdl(id) {
     var ddl = $('[id$=' + id + ']').val();
-    return /(drop column)|(change column)|(modify column)|(alter column)|(drop table)/i.test(ddl)
+    return /(drop column)|(change column)|(modify column)|(alter column)|(drop table)/i.test(ddl);
 }
 
 function validateFinalInsert(id) {
@@ -80,19 +85,25 @@ function validateFinalInsert(id) {
 
 function alertOnDdl(ddl_id, form_class) {
     var alertMsgs = [];
+    // alert about dropping an index
+    if (dropIndexInDdl(ddl_id)) {
+        alertMsgs.push("Before dropping an index you should verify that all the existing indexes on this table match your expectations. " +
+                       "Not doing so could leave you vulnerable to a SEV if an index you think exists actually does not.");
+    }
     // alert about unique indexes in ddl statement
     if (uniqueInDdl(ddl_id)) {
         alertMsgs.push("We found the word 'unique' in your DDL statement. Please be extremely careful when adding unique " +
                       "constraints to a table as there is potential for data loss (existing duplicates for the unique key " +
-                      "will get thrown away).\n\n\n Contact and admin if you have any questions.");
+                      "will get thrown away). Contact an admin if you have any questions.");
     }
+    // alert about changing a column
     if (columnsChangedInDdl(ddl_id)) {
         alertMsgs.push("You are modifying/dropping at least 1 existing column. Be extra careful to make sure there won't " +
-                       "be any unintended consequences from this.")
+                       "be any unintended consequences from this.");
     }
 
     if (alertMsgs.length > 0) {
-        var alertMsg = alertMsgs.join("<br/><br/>")
+        var alertMsg = alertMsgs.join("<br/><br/>");
 
         // stop the submit action
         event.preventDefault();
@@ -113,5 +124,5 @@ function alertOnDdl(ddl_id, form_class) {
             cancel: function(){
             }
         });
-    };
+    }
 }
