@@ -115,6 +115,22 @@ module Api
         render json: @migration
       end
 
+      def offer
+        @migration = Migration.find(params[:id])
+        if @migration.offer!
+          @migration.reload
+        end
+        render json: @migration
+      end
+
+      def unpin_run_host
+        @migration = Migration.find(params[:id])
+        if @migration.unpin_run_host!
+          @migration.reload
+        end
+        render json: @migration
+      end
+
       def append_to_file
         migration_id = params[:migration_id].to_i
         file_type = params[:file_type].to_i
@@ -153,6 +169,18 @@ module Api
         shift_file.contents = contents
         shift_file.save
         shift_file.contents = "Content omitted..." # content can be large, no value in returning it
+
+        render json: shift_file
+      end
+
+      def get_file
+        migration_id = params[:migration_id].to_i
+        file_type = params[:file_type].to_i
+
+        shift_file = ShiftFile.find_by(migration_id: migration_id, file_type: file_type)
+        if shift_file == nil
+          return render json: {message: "File not found"}, status: 404
+        end
 
         render json: shift_file
       end

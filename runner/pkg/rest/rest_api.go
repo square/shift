@@ -43,6 +43,16 @@ type RestClient interface {
 	// values describe all of the fields of a migration.
 	Error(params map[string]string) (RestResponseItem, error)
 
+	// Makes a POST request to the shift api at "/offer".
+	// Returns result as map of strings to interfaces, where keys and
+	// values describe all of the fields of a migration
+	Offer(params map[string]string) (RestResponseItem, error)
+
+	// Makes a POST request to the shift api at "/unpin_run_host".
+	// Returns result as map of strings to interfaces, where keys and
+	// values describe all of the fields of a migration
+	UnpinRunHost(params map[string]string) (RestResponseItem, error)
+
 	// Makes a POST request to the shift api at "/append_to_file".
 	// Returns result as map of strings to interfaces, where keys and
 	// values describe all of the fields of the file minus the contents
@@ -52,4 +62,9 @@ type RestClient interface {
 	// Returns result as map of strings to interfaces, where keys and
 	// values describe all of the fields of the file minus the contents
 	WriteFile(params map[string]string) (RestResponseItem, error)
+
+	// Makes a GET request to the shift api at "/get_file".
+	// Returns result as map of strings to interfaces, where keys and
+	// values describe aff of the fields of the file including the contents
+	GetFile(params map[string]string) (RestResponseItem, error)
 }

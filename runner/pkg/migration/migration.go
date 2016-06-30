@@ -99,7 +99,9 @@ type Migration struct {
 	DdlStatement   string
 	FinalInsert    string
 	Pid            int
+	FilesDir       string
 	StateFile      string
+	LogFile        string
 	DbClient       dbclient.MysqlDB
 	RunType        int
 	Mode           int
@@ -468,4 +470,9 @@ func (migration *Migration) WatchMigrationCopyStderr(stderrPipe io.Reader, copyP
 
 func (migration *Migration) ReadStateFile() ([]byte, error) {
 	return ioutil.ReadFile(migration.StateFile)
+}
+
+func (migration *Migration) WriteStateFile(content []byte) error {
+	err := ioutil.WriteFile(migration.StateFile, content, 0777)
+	return err
 }
