@@ -9,7 +9,7 @@ RSpec.describe MigrationsController, type: :controller do
   let(:profile_client) { instance_double(Profile) }
 
   before(:each) do
-    @cluster = FactoryGirl.create(:cluster)
+    @cluster = FactoryGirl.create(:cluster, admin_review_required: false)
     FactoryGirl.create(:owner, cluster_name: @cluster.name, username: "user1")
     login
   end
@@ -204,7 +204,7 @@ RSpec.describe MigrationsController, type: :controller do
   end
 
   describe 'GET #table_stats' do
-    before (:each) do 
+    before (:each) do
       @completed_migration1 = FactoryGirl.create(:completed_migration,
         cluster_name: @cluster.name,
         database: "testdb",
@@ -551,6 +551,72 @@ RSpec.describe MigrationsController, type: :controller do
 
       it 'redirects to the current migration' do
         expect(response).to redirect_to(@migration)
+      end
+    end
+
+    context 'user cannot approve dangerous short run, but they are trying to' do
+      before :each do
+        login(admin: false)
+
+        FactoryGirl.create(:owner, cluster_name: @cluster.name, username: "developer")
+        @migration = FactoryGirl.create(:approval_migration, cluster_name: @cluster.name,
+                                        table_rows_start: 20000, requestor: "someone")
+        @starting_status = @migration.status
+        allow_any_instance_of(Migration).to receive(:parsed).and_return({:run => :maybeshort})
+        post :approve, id: @migration, runtype: Migration.types[:run][:short]
+        @migration.reload
+      end
+
+      it 'does not approve the migration' do
+        expect(@migration.status).to eq(@starting_status)
+      end
+
+      it 'redirects to 401' do
+        expect(response.status).to eq(401)
+      end
+    end
+
+    context 'user cannot approve dangerous short run, but the table is really small so it is okay' do
+      before :each do
+        login(admin: false)
+
+        FactoryGirl.create(:owner, cluster_name: @cluster.name, username: "developer")
+        @migration = FactoryGirl.create(:approval_migration, cluster_name: @cluster.name,
+                                        table_rows_start: 200, requestor: "someone")
+        @starting_status = @migration.status
+        allow_any_instance_of(Migration).to receive(:parsed).and_return({:run => :maybeshort})
+        post :approve, id: @migration, runtype: Migration.types[:run][:short], lock_version: @migration.lock_version
+        @migration.reload
+      end
+
+      it 'approves the migration' do
+        expect(@migration.status).to eq(statuses[:awaiting_start])
+      end
+
+      it 'redirects to the current migration' do
+        expect(response).to redirect_to(@migration)
+      end
+    end
+
+    context 'user cannot approve dangerous nocheckalter, but they are trying to' do
+      before :each do
+        login(admin: false)
+
+        FactoryGirl.create(:owner, cluster_name: @cluster.name, username: "developer")
+        @migration = FactoryGirl.create(:approval_migration, cluster_name: @cluster.name,
+                                        requestor: "someone")
+        @starting_status = @migration.status
+        allow_any_instance_of(Migration).to receive(:parsed).and_return({:run => :maybenocheckalter})
+        post :approve, id: @migration, runtype: Migration.types[:run][:nocheckalter]
+        @migration.reload
+      end
+
+      it 'does not approve the migration' do
+        expect(@migration.status).to eq(@starting_status)
+      end
+
+      it 'redirects to 401' do
+        expect(response.status).to eq(401)
       end
     end
 
