@@ -48,11 +48,6 @@ module Api
         render json: result.compact.take(Migration.unstage_limit)
       end
 
-      def show
-        @migration = Migration.find(params[:id])
-        render json: @migration
-      end
-
       def unstage
         @migration = Migration.find(params[:id])
         if @migration.unstage!
@@ -157,7 +152,127 @@ module Api
         render json: shift_file
       end
 
+      ## all the methods below this point are used only by the shift-client CLI right now ##
+
+      def show
+        begin
+          @migration = Migration.find(params[:id])
+        rescue ActiveRecord::RecordNotFound
+          return render json: {:status => 404, :errors => ["Migration not found."]}, :status => 404
+        end
+
+        render json: {:migration => @migration, :available_actions => available_actions}
+      end
+
+      def create
+        @migration = Form::NewMigrationRequest.new(params)
+        if @migration.save
+          @migration = Migration.find(@migration.dao.id)
+          return render json: {:migration => @migration, :available_actions => available_actions}
+        else
+          errors = []
+          @migration.errors.full_messages.each do |e|
+            errors << e + "."
+          end
+          return render json: {:status => 400, :errors => errors}, :status => 400
+        end
+      end
+
+      def approve
+        generic_step("approve", params[:approver], params[:runtype], params[:lock_version])
+      end
+
+      def unapprove
+        generic_step("unapprove", params[:lock_version])
+      end
+
+      def start
+        generic_step("start", params[:lock_version], params[:auto_run])
+      end
+
+      def enqueue
+        generic_step("enqueue", params[:lock_version])
+      end
+
+      def dequeue
+        generic_step("dequeue", params[:lock_version])
+      end
+
+      def pause
+        generic_step("pause")
+      end
+
+      def rename
+        generic_step("rename", params[:lock_version])
+      end
+
+      def resume
+        generic_step("resume", params[:lock_version], params[:auto_run])
+      end
+
+      # since we already have a "def cancel" that the runner uses that is slightly different...
+      def cancel_cli
+        generic_step("cancel_cli")
+      end
+
+      def destroy
+        begin
+          @migration = Migration.find(params[:id])
+        rescue ActiveRecord::RecordNotFound
+          return render json: {:status => 404, :errors => ["Migration not found."]}, :status => 404
+        end
+
+        if @migration.delete!(params[:lock_version])
+          send_notifications("migration id #{params[:id]} deleted from the CLI")
+          return render json: {}, :status => 200
+        else
+          return render json: {:status => 400, :errors => generic_error_msg("delete")}, :status => 400
+        end
+      end
+
       private
+
+      def generic_step(step, *extra_params)
+        begin
+          @migration = Migration.find(params[:id])
+        rescue ActiveRecord::RecordNotFound
+          return render json: {:status => 404, :errors => ["Migration not found."]}, :status => 404
+        end
+
+        if @migration.send("#{step.split('_')[0]}!", *extra_params)
+          @migration.reload
+          step_past_tense = case step
+          when "start"
+            "started"
+          when "cancel_cli"
+            "canceled"
+          else
+            step + "d"
+          end
+          send_notifications("migration id #{params[:id]} #{step_past_tense} from the CLI")
+          return render json: {:migration => @migration, :available_actions => available_actions}
+        end
+
+        render json: {:status => 400, :errors => generic_error_msg(step)}, :status => 400
+      end
+
+      def generic_error_msg(step)
+        errors = []
+        errors << "Invalid action." unless available_actions.map{|a| a =~ /^#{step}/ }.any?
+        errors << "Incorrect lock_version supplied." unless params[:lock_version].to_i == @migration.lock_version
+        return errors
+      end
+
+      def available_actions
+        begin
+          result = OscParser.new.parse migration[:ddl_statement]
+          run_action = Migration.types[:action][result[:action]]
+        rescue
+          run_action = Migration.types[:action][:alter]
+        end
+
+        @migration.authorized_actions(@migration.initial_runtype, run_action, true, true, true, true)
+      end
 
       def migration_params
         params.permit(:table_rows_start, :table_rows_end, :table_size_start, :table_size_end,
