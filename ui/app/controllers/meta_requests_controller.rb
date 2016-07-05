@@ -11,7 +11,7 @@ class MetaRequestsController < ApplicationController
       result = OscParser.new.parse @meta_request.ddl_statement
       run_action = Migration.types[:action][result[:action]]
     rescue
-      run_action = Migration.types[:run][:action]
+      run_action = Migration.types[:action][:alter]
     end
 
     @migrations = @meta_request.migrations
@@ -62,7 +62,7 @@ class MetaRequestsController < ApplicationController
         result = OscParser.new.parse meta_request.ddl_statement
         run_action = Migration.types[:action][result[:action]]
       rescue
-        run_action = Migration.types[:run][:action]
+        run_action = Migration.types[:action][:alter]
       end
 
       migration_maps = []

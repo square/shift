@@ -373,12 +373,10 @@ class Migration < ActiveRecord::Base
     when Migration.status_groups[:copy_in_progress]
       if (can_do_any_action || can_do_run_action)
         case run_action
-        when Migration.types[:action][:create], Migration.types[:action][:drop]
-          [:cancel]
         when Migration.types[:action][:alter]
           [:pause, :cancel]
         else
-          []
+          [:cancel]
         end
       else
         []

@@ -1,16 +1,16 @@
 require 'acceptance_helper'
 require 'shared_setup'
-require 'capybara_wait_until'
 
 def get_options(element, with_optgroup)
-  all("##{element} #{with_optgroup ? 'optgroup' : ''} option")
+  find("##{element} #{with_optgroup ? 'optgroup' : ''} option", match: :first)
+  page.all("##{element} #{with_optgroup ? 'optgroup' : ''} option")
 end
 
 def select_random_option(element, with_optgroup: true)
   # wait until js edits DOM completely, try this repetitively
   # as it is not guaranteed that one time is enough
   50.times do
-    page.wait_until{ get_options(element, with_optgroup).length > 1 }
+    break if get_options(element, with_optgroup).length > 1
   end
 
   options = get_options(element, with_optgroup)
