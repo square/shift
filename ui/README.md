@@ -81,6 +81,10 @@ Run the tests
 bundle exec rake spec
 ```
 
+CLI
+------
+There is a CLI available that allows you to do all the actions that are normally done from the UI, from the command line. Check out the [shift-cli README](https://github.com/square/shift/tree/master/ui/shift-client) for more info.
+
 ## License
 
 Copyright (c) 2016 Square Inc. Distributed under the Apache 2.0 License.
