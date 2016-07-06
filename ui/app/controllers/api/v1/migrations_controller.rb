@@ -296,7 +296,7 @@ module Api
 
       def available_actions
         begin
-          result = OscParser.new.parse migration[:ddl_statement]
+          result = OscParser.new.parse @migration[:ddl_statement]
           run_action = Migration.types[:action][result[:action]]
         rescue
           run_action = Migration.types[:action][:alter]
