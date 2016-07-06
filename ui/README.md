@@ -47,10 +47,27 @@ Here are the configuration files/variables that you will probably want to update
     * `config.x.mailer.default_to`: a default local name to send email notifications to
     * `config.x.mailer.default_to_domain`: a default domain to send email notifications to
     * `config.x.ptosc.log_dir`: the path on the filesystem where the shift-runner logs to. If shift and shift-runner run on the same host and shift has read access to the runner's logs, they can be served up in the ui. This is just a nice-to-have
-* `ENV['SECRET_TOKEN']`: your rails secret token
+* `ENV['SECRET_KEY_BASE']`: your rails secret token
 
 #### Adding Clusters and Owners
-Clusters and owners are both stored in the shift database. After you have run `db:setup`, connect to the db and inspect the `clusters` and `owners` tables. For purposes of example, a cluster that points to localhost gets seeded during db:setup. When you insert a cluster, this will cause it to show up in the UI as an option when you go to file a new migration. When a migration runs on the cluster, it will connect to the `rw_host` and `port` specified by you in the table
+Clusters and owners are both stored in the shift database. After you have run `db:setup`, connect to the db and inspect the `clusters` and `owners` tables. For purposes of example, a cluster that points to localhost gets seeded during db:setup. When you insert a cluster, this will cause it to show up in the UI as an option when you go to file a new migration. When a migration runs on the cluster, it will connect to the `rw_host` and `port` specified by you in the table.
+
+As of now, the only way to add new clusters and owners is to connect directly to the shift database and insert records. Ex:
+```
+mysql shift_development
+> insert into clusters (`name`, `app`, `rw_host`, `port`, `admin_review_required`, `is_staging`) values ('cluster-name', 'clusters-app', 'hostname', 'port', true, false);
+# this will create a cluster called "cluster-name" that will show up in the production section of the cluster dropdown menu (since "is_staging" is false) when you go to
+# create a migration. Migrations filed against this cluster will run on "hostname" on port "port". Admins will be required to approve migrations against this cluster
+# (i.e., even if a user is an owner of the cluster, they won't be able to approve migrations on it).
+
+> insert into owners (`cluster_name`, `username`) values ('cluster-name', 'john');
+# this will establish "john" as an owner of the cluster "cluster-name". This will
+# give john the ability to run/pause/cancel/etc. any migrations filed against "cluster-name".
+# It would also give him the ability to approve migrations filed against "cluster-name" if
+# "admin_review_required" was set to false on the cluster.
+```
+
+At some point in the future there could be a way to do this from the ui.
 
 #### Services
 There is a rufus-scheduler job that runs alongside the rails server. The job runs every 15 seconds and tries to start migrations that are queued up to run. You can find it here `config/initializers/migration_scheduler.rb`
@@ -62,7 +79,23 @@ Setting these up is entirely optional. If you don't do it, shift will still work
 * IMGKit: create status images from html. Read the [imgkit docs](https://github.com/csquared/IMGKit#imgkit) for more info on setting this up
 
 #### Deploying
-You will probably want to use something like [capistrano](https://github.com/capistrano/capistrano) to deploy to your staging and production environments
+You will probably want to use something like [capistrano](https://github.com/capistrano/capistrano) to deploy to your staging and production environments.
+
+Since the rails server is mainly used for development, you should use a real web server (ex: [Phusion Passenger](https://www.phusionpassenger.com/)) when deployig to your production and staging environments. To run in either of these environments, make sure you set the following ENV variables first
+```
+export RAILS_ENV="production"
+# OR
+export RAILS_ENV="staging"
+
+export SECRET_KEY_BASE="some_random_30_char_string"
+# check out shift/ui/config/secrets.yml for more info about this
+```
+Note: both the staging and production configs (`shift/ui/config/environments/{staging,production}.rb`) are setup to run as https. If you're not ready to support that, edit the configs and remove the SSL sections.
+
+If you have to run the development web server, you can set the same ENV variables as above, or you can start the server with
+```
+bundle exec rails server -e production # or staging
+```
 
 Authentication and Authorization
 ------

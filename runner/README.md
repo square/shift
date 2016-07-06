@@ -65,7 +65,14 @@ Here are the configuration files that you will probably want to update (although
   * `database_override`: same as above, but for a database
 
 #### Deployment
-`go build`, deploy the resulting binary to your staging/production machines, and run it
+`go build`, deploy the resulting binary to your staging/production machines, and run it.
+
+To get the runner to run in production or staging mode, set the following ENV variable. Doing so will cause the runner to read from the corresponding configs in `shift/runner/config/`
+```
+export ENVIRONMENT="production"
+# OR
+export ENVIRONMENT="staging"
+```
 
 Development
 ------
