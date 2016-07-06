@@ -281,6 +281,18 @@ class Migration < ActiveRecord::Base
     deleted.length == 1
   end
 
+  def offer!
+    updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:copy_in_progress]).
+      update_all(:status => STATUS_GROUPS[:copy_in_progress], :staged => true)
+    updated == 1
+  end
+
+  def unpin_run_host!
+    updated = Migration.where(:id => self.id).
+      update_all(:run_host => nil)
+    updated == 1
+  end
+
   def unstage!
     if self.staged?
       self.staged = false

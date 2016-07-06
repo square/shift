@@ -48,6 +48,9 @@ var (
 	ErrError        = &rest.RestError{"Error", errors.New("there was an error")}
 	ErrAppendToFile = &rest.RestError{"AppendToFile", errors.New("there was an error")}
 	ErrWriteFile    = &rest.RestError{"WriteFile", errors.New("there was an error")}
+	ErrOffer        = &rest.RestError{"Offer", errors.New("there was an error")}
+	ErrUnpinRunHost = &rest.RestError{"UnpinHost", errors.New("there was an error")}
+	ErrGetFile      = &rest.RestError{"GetFile", errors.New("there was an error")}
 )
 
 func validTableStatsPayload(id, startOrEnd string) map[string]string {
@@ -71,8 +74,11 @@ type stubRestClient struct {
 	fail         int
 	err          int
 	cancel       int
+	offer        int
+	unpinRunHost int
 	appendToFile int
 	writeFile    int
+	getFile      int
 }
 
 func (restClient stubRestClient) Staged() (rest.RestResponseItems, error) {
@@ -170,6 +176,29 @@ func (restClient stubRestClient) Cancel(params map[string]string) (rest.RestResp
 	}
 }
 
+func (restClient stubRestClient) Offer(params map[string]string) (rest.RestResponseItem, error) {
+	payloadReceived = params
+	if restClient.offer == 0 {
+		return rest.RestResponseItem{}, nil
+	} else if restClient.offer == 1 {
+		migration := make(map[string]interface{})
+		return migration, nil
+	} else {
+		return nil, ErrOffer
+	}
+}
+
+func (restClient stubRestClient) UnpinRunHost(params map[string]string) (rest.RestResponseItem, error) {
+	if restClient.unpinRunHost == 0 {
+		return rest.RestResponseItem{}, nil
+	} else if restClient.unpinRunHost == 1 {
+		migration := make(map[string]interface{})
+		return migration, nil
+	} else {
+		return nil, ErrUnpinRunHost
+	}
+}
+
 func (restClient stubRestClient) AppendToFile(params map[string]string) (rest.RestResponseItem, error) {
 	params["contents"] = params["contents"][22:] // rips out timestamp
 	appendPayload = append(appendPayload, params)
@@ -192,6 +221,17 @@ func (restClient stubRestClient) WriteFile(params map[string]string) (rest.RestR
 		return shiftFile, nil
 	} else {
 		return nil, ErrWriteFile
+	}
+}
+
+func (restClient stubRestClient) GetFile(params map[string]string) (rest.RestResponseItem, error) {
+	if restClient.getFile == 0 {
+		return rest.RestResponseItem{}, nil
+	} else if restClient.getFile == 1 {
+		shiftFile := make(map[string]interface{})
+		return shiftFile, nil
+	} else {
+		return nil, ErrGetFile
 	}
 }
 
@@ -238,6 +278,43 @@ func TestMaybeReplaceHostname(t *testing.T) {
 		if actualResponse != expectedResponse {
 			t.Errorf("response = %v, want %v", actualResponse, expectedResponse)
 		}
+	}
+}
+
+var killAndOfferMigrationsTests = []struct {
+	runningMigrations         map[int]int
+	expectedPayload           map[string]string
+	expectedRunningMigrations map[int]int
+}{
+	{map[int]int{}, nil, map[int]int{}},
+	{map[int]int{123: -1}, map[string]string{"id": "123"}, map[int]int{}},
+}
+
+func TestKillAndOfferMigrations(t *testing.T) {
+	for _, tt := range killAndOfferMigrationsTests {
+		payloadReceived = nil
+		runningMigrations = tt.runningMigrations
+		currentRunner := initRunner(stubRestClient{}, "", "", "")
+
+		killPtOscById = func(migrationId int) error {
+			return nil // nop
+		}
+
+		currentRunner.killAndOfferMigrations()
+
+		expectedPayload := tt.expectedPayload
+		actualPayload := payloadReceived
+		if !reflect.DeepEqual(actualPayload, expectedPayload) {
+			t.Errorf("payload = %v, want %v", actualPayload, expectedPayload)
+		}
+
+		expectedRunningMigrations := tt.expectedRunningMigrations
+		actualRunningMigrations := runningMigrations
+		if !reflect.DeepEqual(actualRunningMigrations, expectedRunningMigrations) {
+			t.Errorf("running migrations = %v, want %v",
+				actualRunningMigrations, expectedRunningMigrations)
+		}
+
 	}
 }
 
@@ -310,15 +387,6 @@ var unstageRunnableMigrationTests = []struct {
 		"mode":    float64(migration.TABLE_MODE),
 		"action":  float64(migration.ALTER_ACTION),
 	}, []int{1}, "host", 1, ErrInvalidMigration, nil, nil},
-	// migration is pinned to another host
-	{map[string]interface{}{
-		"status":   float64(1),
-		"id":       float64(7),
-		"run_host": "another.host",
-		"runtype":  float64(migration.LONG_RUN),
-		"mode":     float64(migration.TABLE_MODE),
-		"action":   float64(migration.ALTER_ACTION),
-	}, []int{1}, "host", 1, nil, nil, nil},
 	// fail to unstage the migration
 	{map[string]interface{}{
 		"status":        float64(1),
@@ -329,7 +397,6 @@ var unstageRunnableMigrationTests = []struct {
 		"table":         table,
 		"ddl_statement": validDdl1,
 		"final_insert":  finalInsert,
-		"run_host":      nil,
 		"runtype":       float64(migration.LONG_RUN),
 		"mode":          float64(migration.TABLE_MODE),
 		"action":        float64(migration.ALTER_ACTION),
@@ -344,7 +411,6 @@ var unstageRunnableMigrationTests = []struct {
 		"table":         table,
 		"ddl_statement": validDdl1,
 		"final_insert":  finalInsert,
-		"run_host":      nil,
 		"runtype":       float64(migration.LONG_RUN),
 		"mode":          float64(migration.TABLE_MODE),
 		"action":        float64(migration.ALTER_ACTION),
@@ -357,37 +423,10 @@ var unstageRunnableMigrationTests = []struct {
 		Table:          table,
 		DdlStatement:   validDdl1,
 		FinalInsert:    finalInsert,
+		FilesDir:       "id-7/",
 		StateFile:      "id-7/statefile.txt",
+		LogFile:        "id-7/ptosc-output.log",
 		RunType:        migration.LONG_RUN,
-		Mode:           migration.TABLE_MODE,
-		Action:         migration.ALTER_ACTION,
-		PendingDropsDb: pendingDropsDb,
-	}, map[string]string{"id": "7"}},
-	// successfully unstage a migration pinned to this host
-	{map[string]interface{}{
-		"status":        float64(1),
-		"id":            float64(7),
-		"host":          validHost,
-		"port":          float64(port),
-		"database":      database,
-		"table":         table,
-		"ddl_statement": validDdl1,
-		"final_insert":  finalInsert,
-		"run_host":      "host",
-		"runtype":       float64(migration.NOCHECKALTER_RUN),
-		"mode":          float64(migration.TABLE_MODE),
-		"action":        float64(migration.ALTER_ACTION),
-	}, []int{1}, "host", 1, nil, &migration.Migration{
-		Id:             7,
-		Status:         1,
-		Host:           validHost,
-		Port:           port,
-		Database:       database,
-		Table:          table,
-		DdlStatement:   validDdl1,
-		FinalInsert:    finalInsert,
-		StateFile:      "id-7/statefile.txt",
-		RunType:        migration.NOCHECKALTER_RUN,
 		Mode:           migration.TABLE_MODE,
 		Action:         migration.ALTER_ACTION,
 		PendingDropsDb: pendingDropsDb,
@@ -558,7 +597,7 @@ var processMigrationTests = []struct {
 		"pauseMigrationStep": 1,
 		"killMigStep":        0,
 	}},
-	// fail on killMig step
+	// fail on killMigration step
 	{migration.CancelStatus, 1, 0, 0, 0, 0, 0, "", map[string]int{
 		"failMigration":      1,
 		"setupDbClient":      1,
@@ -593,6 +632,7 @@ var processMigrationTests = []struct {
 func TestProcessMigration(t *testing.T) {
 	for _, tt := range processMigrationTests {
 		testRunner := initRunner(stubRestClient{}, "", "", "")
+		unstagedMigrationsWaitGroup.Add(1)
 		// keep track of the # of calls for each method
 		methodCallCounts := map[string]int{
 			"failMigration":      0,
@@ -650,7 +690,7 @@ func TestProcessMigration(t *testing.T) {
 				return errors.New("error")
 			}
 		}
-		killMig = func(*migration.Migration) error {
+		killMigration = func(*runner, *migration.Migration) error {
 			methodCallCounts["killMigStep"]++
 			if tt.killMigStepResponse == 1 {
 				return nil
@@ -726,7 +766,7 @@ func TestPrepMigrationStep(t *testing.T) {
 		ValidateFinalInsert = func(*migration.Migration) error {
 			return tt.finalInsertError
 		}
-		execPtOsc = func(*runner, *migration.Migration, commandOptionGenerator, chan int) (bool, error) {
+		execPtOsc = func(*runner, *migration.Migration, commandOptionGenerator, chan int, bool) (bool, error) {
 			return false, tt.ptOscError
 		}
 		DryRunCreatesNew = func(*migration.Migration) error {
@@ -970,11 +1010,12 @@ var runMigrationPtOscTests = []struct {
 
 func TestRunMigrationPtOsc(t *testing.T) {
 	for _, tt := range runMigrationPtOscTests {
+		unstagedMigrationsWaitGroup.Add(1)
 		payloadReceived = nil
 		currentRunner := initRunner(stubRestClient{nextStep: tt.nextStep, update: tt.update, err: tt.errorOut}, "", "", "")
 		currentRunner.Hostname = "host"
 		mig := &migration.Migration{Id: 7}
-		execPtOsc = func(*runner, *migration.Migration, commandOptionGenerator, chan int) (bool, error) {
+		execPtOsc = func(*runner, *migration.Migration, commandOptionGenerator, chan int, bool) (bool, error) {
 			return tt.canceled, tt.ptOscError
 		}
 
@@ -1028,7 +1069,7 @@ func TestRenameTablesStep(t *testing.T) {
 	for _, tt := range renameTablesStepTests {
 		payloadReceived = nil
 		currentRunner := initRunner(stubRestClient{update: tt.update, complete: tt.complete}, "", "", "")
-		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert, Database: "db1"}
+		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert, Database: "db1", FilesDir: "id-7", StateFile: "id-7/statefile.txt", LogFile: "id-7/ptosc-output.log"}
 		SwapOscTables = func(*migration.Migration) (string, error) {
 			return "_tablename_new", tt.swapOscTablesError
 		}
@@ -1182,7 +1223,8 @@ var killMigrationTests = []struct {
 
 func TestKillMigration(t *testing.T) {
 	for _, tt := range killMigrationTests {
-		mig := &migration.Migration{Id: 7}
+		runner := initRunner(stubRestClient{}, ".", "", "")
+		mig := &migration.Migration{Id: 7, FilesDir: ".", StateFile: "./statefile.txt"}
 		killPtOsc = func(*migration.Migration) error {
 			return tt.killPtOscError
 		}
@@ -1191,7 +1233,7 @@ func TestKillMigration(t *testing.T) {
 		}
 
 		expectedError := tt.expectedError
-		actualError := killMigration(mig)
+		actualError := runner.killMigration(mig)
 		if actualError != expectedError {
 			t.Errorf("error = %v, want %v", actualError, expectedError)
 		}
@@ -1223,7 +1265,10 @@ func TestWriteToPtOscLog(t *testing.T) {
 	close(ptOscLogChan)
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(1)
+	fileSyncWaitGroup.Add(1)
 	runner.writeToPtOscLog(nil, ptOscLogChan, writerFunc, 1, &waitGroup)
+	waitGroup.Wait()
+	fileSyncWaitGroup.Wait()
 	if !reflect.DeepEqual(actualLines, expectedLines) {
 		t.Errorf("lines = %v, want %v", actualLines, expectedLines)
 	}
@@ -1382,7 +1427,7 @@ func TestExecPtOsc(t *testing.T) {
 		appendPayload = nil
 		writePayload = nil
 		currentRunner := initRunner(stubRestClient{}, tt.logDir, "", tt.commandPath)
-		mig := &migration.Migration{Id: 7, Status: tt.status, StateFile: "id-7/statefile.txt"}
+		mig := &migration.Migration{Id: 7, Status: tt.status, FilesDir: "id-7/", StateFile: "id-7/statefile.txt", LogFile: "id-7/ptosc-output.log"}
 
 		// specify the exact options we want
 		commandGenerator := func(*migration.Migration) []string {
@@ -1414,7 +1459,7 @@ func TestExecPtOsc(t *testing.T) {
 			copyPercentChan = make(chan int)
 		}
 
-		actualCanceled, actualError := currentRunner.execPtOsc(mig, commandGenerator, copyPercentChan)
+		actualCanceled, actualError := currentRunner.execPtOsc(mig, commandGenerator, copyPercentChan, true)
 
 		// cleanup the pt-osc log file...hard coded for now
 		_ = os.Remove(tt.logDir + "id-7/ptosc-output.log")
@@ -1468,8 +1513,10 @@ func TestUpdateMigrationCopyPercentage(t *testing.T) {
 
 	copyPercentChan <- copyPercentage
 	close(copyPercentChan)
+	fileSyncWaitGroup.Add(1)
 	waitGroup.Add(1)
 	currentRunner.updateMigrationCopyPercentage(migration, copyPercentChan, &waitGroup)
+	fileSyncWaitGroup.Wait()
 	waitGroup.Wait()
 
 	expectedPayload := map[string]string{"id": "7", "copy_percentage": "38"}

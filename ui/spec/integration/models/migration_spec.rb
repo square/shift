@@ -460,6 +460,35 @@ RSpec.describe Migration do
     end
   end
 
+  describe 'offer!' do
+    context 'is on a offerable step' do
+      it 'offers the migration' do
+        migration = FactoryGirl.create(:copy_migration, staged: false)
+        expect(migration.offer!).to eq(true)
+        migration.reload
+        expect(migration.staged).to eq(true)
+      end
+    end
+
+    context 'is not on a offerable step' do
+      it 'does not offer the migration' do
+        migration = FactoryGirl.create(:approval_migration, staged: false)
+        expect(migration.offer!).to eq(false)
+        migration.reload
+        expect(migration.staged).to eq(false)
+      end
+    end
+  end
+
+  describe 'unpin_run_host!' do
+    it 'makes the migration run_host nil' do
+      migration = FactoryGirl.create(:migration, run_host: "host")
+      expect(migration.unpin_run_host!).to eq(true)
+      migration.reload
+      expect(migration.run_host).to be_nil
+    end
+  end
+
   describe 'unstage!' do
     it 'unstages the migration' do
       migration = FactoryGirl.create(:canceled_migration)

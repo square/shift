@@ -17,6 +17,7 @@ pt_osc_path: pt-online-schema-change
 pending_drops_db:
 log_sync_interval: 10
 state_sync_interval: 10
+stop_file_path: /tmp/stop_shift_runner
 
 # optionally override the host/port/db to run an OSC on
 host_override:
