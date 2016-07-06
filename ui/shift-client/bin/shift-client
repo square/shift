@@ -42,8 +42,8 @@ class ShiftClientCLI
       create_migration.option "--database DATABASE", String, "The database to run a migration on"
       create_migration.option "--ddl-statement DDL STATEMENT", String, "The ddl statement to run"
       create_migration.option "--pr-url PR URL", String, "The pull request URL associated with the migration"
-      create_migration.option "--requestor", String, "Username of the person creating the migration"
-      create_migration.option "--final-insert", String, "A final insert statement"
+      create_migration.option "--requestor REQUESTOR", String, "Username of the person creating the migration"
+      create_migration.option "--final-insert FINAL INSERT", String, "A final insert statement"
 
       create_migration.action do |args, options|
         raise "Must provide --cluster" unless options.cluster
@@ -68,7 +68,7 @@ class ShiftClientCLI
           c.option "--lock-version LOCK VERSION", String, "The most recent lock version of the migration"
         end
         if %w(approve).include?(action)
-          c.option "--run-type RUN TYPE", String, "The type of run to approve (options are: short, long, nocheckalter)"
+          c.option "--runtype RUNTYPE", String, "The type of run to approve (options are: short, long, nocheckalter)"
           c.option "--approver APPROVER", String, "The username of the approver"
         end
         if %w(start resume).include?(action)
@@ -81,10 +81,13 @@ class ShiftClientCLI
             raise "Must provide --lock-version" unless options.lock_version
           end
           if %w(approve).include?(action)
-            raise "Must provide --run-type" unless options.run_type
+            raise "Must provide --runtype" unless options.runtype
+            raise "Must provide --approver" unless options.approver
           end
 
           client = shift_client_with_auth(options)
+          # use the correct cancel endpoint
+          action = "cancel_cli" if action == "cancel"
           display client.generic_migration_action_post(action, options)
         end
       end

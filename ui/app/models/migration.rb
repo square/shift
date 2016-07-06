@@ -188,6 +188,10 @@ class Migration < ActiveRecord::Base
   end
 
   def approve!(current_user_name, runtype, lock_version)
+    if runtype.is_a? String
+      runtype = TYPES[:run][runtype.to_sym]
+    end
+
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_approval], :lock_version => lock_version).
       update_all(:runtype => runtype, :approved_by => current_user_name,
                  :approved_at =>  DateTime.now, :status => STATUS_GROUPS[:awaiting_start])

@@ -212,7 +212,7 @@ module Api
 
       # since we already have a "def cancel" that the runner uses that is slightly different...
       def cancel_cli
-        generic_step("cancel_cli")
+        generic_step("cancel")
       end
 
       def destroy
@@ -239,18 +239,20 @@ module Api
           return render json: {:status => 404, :errors => ["Migration not found."]}, :status => 404
         end
 
-        if @migration.send("#{step.split('_')[0]}!", *extra_params)
-          @migration.reload
-          step_past_tense = case step
-          when "start"
-            "started"
-          when "cancel_cli"
-            "canceled"
-          else
-            step + "d"
+        # make sure we don't allow approving a run type that shouldn't be allowed
+        action_step = step == "approve" ? "#{step}_#{params[:runtype]}" : step
+        if available_actions.map{|a| a.to_s == action_step }.any?
+          if @migration.send("#{step.split('_')[0]}!", *extra_params)
+            @migration.reload
+            step_past_tense = case step
+            when "start" || "cancel"
+              step + "ed"
+            else
+              step + "d"
+            end
+            send_notifications("migration id #{params[:id]} #{step_past_tense} from the CLI")
+            return render json: {:migration => @migration, :available_actions => available_actions}
           end
-          send_notifications("migration id #{params[:id]} #{step_past_tense} from the CLI")
-          return render json: {:migration => @migration, :available_actions => available_actions}
         end
 
         render json: {:status => 400, :errors => generic_error_msg(step)}, :status => 400
@@ -258,7 +260,8 @@ module Api
 
       def generic_error_msg(step)
         errors = []
-        errors << "Invalid action." unless available_actions.map{|a| a =~ /^#{step}/ }.any?
+        action_step = step == "approve" ? "#{step}_#{params[:runtype]}" : step
+        errors << "Invalid action." unless available_actions.map{|a| a.to_s == action_step }.any?
         errors << "Incorrect lock_version supplied." unless params[:lock_version].to_i == @migration.lock_version
         return errors
       end
@@ -271,7 +274,11 @@ module Api
           run_action = Migration.types[:action][:alter]
         end
 
-        @migration.authorized_actions(@migration.initial_runtype, run_action, true, true, true, true)
+        a = @migration.authorized_actions(@migration.initial_runtype, run_action, true, true, true, true)
+        # manually add support for this in the cli since we don't yet have full support in the ui.
+        # remove this once you can enqueue a single migration in the ui
+        a << :enqueue if @migration.status == 2
+        return a
       end
 
       def migration_params

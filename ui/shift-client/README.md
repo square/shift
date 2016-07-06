@@ -91,7 +91,7 @@ $ shift-client approve migration --help
     --lock-version LOCK VERSION
         The most recent lock version of the migration
 
-    --run-type RUN TYPE
+    --runtype RUNTYPE
         The type of run to approve (options are: short, long, nocheckalter)
 
     --approver APPROVER
@@ -135,7 +135,7 @@ $ shift-client get migration --id 25
     "run_host": null,
     "lock_version": 7,
     "editable": false,
-    "runtype": null,
+    "runtype": 1,
     "meta_request_id": null,
     "initial_runtype": 1,
     "auto_run": true
@@ -170,7 +170,7 @@ $ shift-client start migration --id 25 --lock-version 8
 ## Option descriptions
 * `--id`: the id of the migration you want to act on. Can get this from the response of a successful `shift-client create migration` command
 * `--lock-version`: the most recent lock-version of a migration. This is used so that we know a migration's status hasn't changed without you knowing. Can get this from the response of any successful command
-* `--run-type`: the type of run to approve a migration with (options are: short, long, nocheckalter). When you run `shift-client get migration` on a migration that is in the "awaiting_approval" step, the available actions in the JSON response will look something like `["approve_short", "approve_long"]`. That means that when you run `shift-client approve migration`, you must supply either `--run-type short` or `--run-type long`. A short run is one that runs an alter directly on a table. A long run is one that uses pt-osc. A nocheckalter run is one that uses pt-osc with the --nocheck-alter flag.
+* `--runtype`: the type of run to approve a migration with (options are: short, long, nocheckalter). When you run `shift-client get migration` on a migration that is in the "awaiting_approval" step, the available actions in the JSON response will look something like `["approve_short", "approve_long"]`. That means that when you run `shift-client approve migration`, you must supply either `--runtype short` or `--runtype long`. A short run is one that runs an alter directly on a table. A long run is one that uses pt-osc. A nocheckalter run is one that uses pt-osc with the --nocheck-alter flag.
 * `--auto-run`: this option can be passed to `shift-client start migration` and `shift-client resume migration`. When it is used, the migration will automatically rename tables after it is done copying all of its rows (instead of waiting for human interaction). `shift-client enqueue migration` automatically sets this to true
 * All of the other options should be pretty self explanatory
 

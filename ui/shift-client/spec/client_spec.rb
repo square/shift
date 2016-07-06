@@ -12,9 +12,9 @@ describe ShiftClient do
   let(:ddl_statement) { "alter table slug" }
   let(:pr_url) { "github.com/pr" }
   let(:requestor) { "michael" }
-  let(:final_insert) { nil }
+  let(:final_insert) { "" }
   let(:lock_version) { 7 }
-  let(:run_type) { "long" }
+  let(:runtype) { "long" }
   let(:approver) { "frank" }
 
   it "#get_migration" do
@@ -47,7 +47,7 @@ describe ShiftClient do
     options = OpenStruct.new \
       :id           => migration_id,
       :lock_version => lock_version,
-      :run_type     => run_type,
+      :runtype      => runtype,
       :approver     => approver
     path = shift_client.url + "/api/v1/migrations/" + action
     resource_double = instance_double(RestClient::Resource)

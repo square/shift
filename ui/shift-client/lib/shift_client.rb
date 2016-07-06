@@ -23,7 +23,7 @@ class ShiftClient
       :ddl_statement => ddl_statement,
       :pr_url        => pr_url,
       :requestor     => requestor,
-      :final_insert  => final_insert,
+      :final_insert  => final_insert || "",
     }
 
     shift_post("/api/v1/migrations", params)
@@ -33,7 +33,7 @@ class ShiftClient
     params = {}
     params[:id] = options.id
     params[:lock_version] = options.lock_version if options.lock_version
-    params[:run_type] = options.run_type if options.run_type
+    params[:runtype] = options.runtype if options.runtype
     params[:approver] = options.approver if options.approver
     params[:auto_run] = options.auto_run if options.auto_run
 
