@@ -61,9 +61,18 @@ Rails.application.routes.draw do
           post 'append_to_file'
           post 'write_file'
           get 'get_file'
+          post 'approve'
+          post 'unapprove'
+          post 'start'
+          post 'enqueue'
+          post 'dequeue'
+          post 'pause'
+          post 'rename'
+          post 'resume'
+          post 'cancel_cli'
         end
       end
-      resources :migrations, :only => [:show, :update]
+      resources :migrations, :only => [:show, :update, :create, :destroy]
     end
   end
 

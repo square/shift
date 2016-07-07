@@ -1,0 +1,133 @@
+#!/usr/bin/env ruby
+
+$LOAD_PATH.unshift File.expand_path("../../lib", __FILE__)
+
+require "commander/import"
+require "colored"
+
+require "shift_client"
+require "shift_client/version"
+
+program :name, 'shift-client'
+program :version, ShiftClient::VERSION
+program :description, 'Interact with the shift API from the command-line'
+
+class ShiftClientCLI
+  include Commander::Methods
+  DEFAULT_SHIFT_URL = "http://localhost:3000"
+
+  global_option "--url URL", String, "The API URL for shift (default: #{DEFAULT_SHIFT_URL})"
+  global_option "--ssl-cert SSL CERT", String, "An SSL cert for authenticating against the shift api"
+  global_option "--ssl-key SSL KEY", String, "An SSL key for authenticating against the shift api"
+  global_option "--ssl-ca SSL CA", String, "An SSL CA cert for authenticating against the shift api"
+
+  def run
+    command :'get migration' do |get_migration|
+      get_migration.syntax = "shift-client get migration [options]"
+      get_migration.description = "Get a migration"
+      get_migration.option "--id ID", String, "The id of the migration"
+
+      get_migration.action do |args, options|
+        raise "Must provide --id" unless options.id
+
+        client = shift_client_with_auth(options)
+        display client.get_migration(options.id)
+      end
+    end
+
+    command :'create migration' do |create_migration|
+      create_migration.syntax = "shift-client create migration [options]"
+      create_migration.description = "Create a migration"
+      create_migration.option "--cluster CLUSTER", String, "The cluster to run a migration on"
+      create_migration.option "--database DATABASE", String, "The database to run a migration on"
+      create_migration.option "--ddl-statement DDL STATEMENT", String, "The ddl statement to run"
+      create_migration.option "--pr-url PR URL", String, "The pull request URL associated with the migration"
+      create_migration.option "--requestor REQUESTOR", String, "Username of the person creating the migration"
+      create_migration.option "--final-insert FINAL INSERT", String, "A final insert statement"
+
+      create_migration.action do |args, options|
+        raise "Must provide --cluster" unless options.cluster
+        raise "Must provide --database" unless options.database
+        raise "Must provide --ddl-statement" unless options.ddl_statement
+        raise "Must provide --pr-url" unless options.pr_url
+        raise "Must provide --requestor" unless options.requestor
+
+        client = shift_client_with_auth(options)
+        display client.create_migration(options.cluster, options.database, options.ddl_statement, options.pr_url, options.requestor, final_insert: options.final_insert)
+      end
+    end
+
+    # generic actions
+    %w(approve unapprove start enqueue dequeue pause rename resume cancel).each do |action|
+      command :"#{action} migration" do |c|
+        c.syntax = "shift-client #{action} migration [options]"
+        c.description = "#{action.capitalize} a migration"
+
+        c.option "--id ID", String, "The id of the migration"
+        if %w(approve unapprove start enqueue dequeue rename resume).include?(action)
+          c.option "--lock-version LOCK VERSION", String, "The most recent lock version of the migration"
+        end
+        if %w(approve).include?(action)
+          c.option "--runtype RUNTYPE", String, "The type of run to approve (options are: short, long, nocheckalter)"
+          c.option "--approver APPROVER", String, "The username of the approver"
+        end
+        if %w(start resume).include?(action)
+          c.option "--auto-run", String, "If passed, this migration will automatically rename tables after completing the copy step"
+        end
+
+        c.action do |args, options|
+          raise "Must provide --id" unless options.id
+          if %w(approve unapprove start enqueue dequeue rename resume).include?(action)
+            raise "Must provide --lock-version" unless options.lock_version
+          end
+          if %w(approve).include?(action)
+            raise "Must provide --runtype" unless options.runtype
+            raise "Must provide --approver" unless options.approver
+          end
+
+          client = shift_client_with_auth(options)
+          # use the correct cancel endpoint
+          action = "cancel_cli" if action == "cancel"
+          display client.generic_migration_action_post(action, options)
+        end
+      end
+    end
+
+    command :'delete migration' do |delete_migration|
+      delete_migration.syntax = "shift-client delete migration [options]"
+      delete_migration.description = "Delete a migration"
+
+      delete_migration.option "--id ID", String, "The id of the migration"
+      delete_migration.option "--lock-version LOCK VERSION", String, "The most recent lock version of the migration"
+
+      delete_migration.action do |args, options|
+        raise "Must provide --id" unless options.id
+        raise "Must provide --lock-version" unless options.lock_version
+
+        client = shift_client_with_auth(options)
+        display client.delete_migration(options.id, options.lock_version)
+      end
+    end
+
+    run!
+  end
+
+  def shift_client_with_auth(options)
+    url = options.api || DEFAULT_SHIFT_URL
+    insecure = (options.ssl_cert && options.ssl_key && options.ssl_ca).nil?
+
+    ShiftClient.new(
+      url:      url,
+      insecure: insecure,
+      ssl_cert: options.ssl_cert,
+      ssl_key:  options.ssl_key,
+      ssl_ca:   options.ssl_ca,
+    )
+  end
+
+  def display(output)
+    puts JSON.pretty_generate output
+  end
+end
+
+ShiftClientCLI.new.run

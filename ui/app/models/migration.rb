@@ -188,6 +188,10 @@ class Migration < ActiveRecord::Base
   end
 
   def approve!(current_user_name, runtype, lock_version)
+    if runtype.is_a? String
+      runtype = TYPES[:run][runtype.to_sym]
+    end
+
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_approval], :lock_version => lock_version).
       update_all(:runtype => runtype, :approved_by => current_user_name,
                  :approved_at =>  DateTime.now, :status => STATUS_GROUPS[:awaiting_start])
@@ -385,12 +389,10 @@ class Migration < ActiveRecord::Base
     when Migration.status_groups[:copy_in_progress]
       if (can_do_any_action || can_do_run_action)
         case run_action
-        when Migration.types[:action][:create], Migration.types[:action][:drop]
-          [:cancel]
         when Migration.types[:action][:alter]
           [:pause, :cancel]
         else
-          []
+          [:cancel]
         end
       else
         []

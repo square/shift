@@ -132,25 +132,6 @@ RSpec.describe Api::V1::MigrationsController, type: :controller do
     end
   end
 
-  describe 'GET #show' do
-    before (:each) do
-      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name)
-      get :show, id: @migration
-    end
-
-    it 'assings the requested migration to @migration' do
-      expect(assigns(:migration)).to eq(@migration)
-    end
-
-    it 'returns migration as json' do
-      expect(json["id"]).to eq(@migration["id"])
-    end
-
-    it 'returns a 200 status code' do
-      expect(response).to have_http_status(200)
-    end
-  end
-
   describe 'POST #unstage' do
     context 'is staged' do
       before (:each) do
@@ -516,6 +497,267 @@ RSpec.describe Api::V1::MigrationsController, type: :controller do
     it 'returns a 404 status code when file cannot be found' do
       get :get_file, migration_id: 999, file_type: 1
       expect(response).to have_http_status(404)
+    end
+  end
+
+  describe 'GET #show' do
+    before (:each) do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, status: 1,
+                                      ddl_statement: "alter table b add column c int")
+      get :show, id: @migration
+    end
+
+    it 'returns migration as json' do
+      expect(json["migration"]["id"]).to eq(@migration["id"])
+    end
+
+    it 'returns available actions as json' do
+      expect(json["available_actions"]).to eq(["delete"])
+    end
+
+    it 'returns a 200 status code' do
+      expect(response).to have_http_status(200)
+    end
+  end
+
+  describe 'POST #create' do
+    context 'with valid attributes' do
+      it 'creates a new migration' do
+        expect{
+          post :create, cluster_name: @cluster.name, database: "db1", ddl_statement: "alter table users add column c int",
+               pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+        }.to change(Migration, :count).by(1)
+      end
+
+      it 'returns migration as json' do
+        allow_any_instance_of(Migration).to receive(:parsed).and_return({:run => :maybeshort})
+        post :create, cluster_name: @cluster.name, database: "db1", ddl_statement: "alter table users add column c int",
+             pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+        expect(json["migration"]["database"]).to eq("db1")
+      end
+
+      it 'returns a 200 status code' do
+        post :create, cluster_name: @cluster.name, database: "db1", ddl_statement: "alter table users add column c int",
+             pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+        expect(response).to have_http_status(200)
+      end
+    end
+
+    context 'with invalid attributes' do
+      it 'does not save a new migration' do
+        expect{
+          post :create, cluster_name: nil, database: "db1", ddl_statement: "alter table users add column c int",
+               pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+          }.to_not change(Migration, :count)
+      end
+
+      it 'returns an error message as json' do
+        post :create, cluster_name: nil, database: "db1", ddl_statement: "alter table users add column c int",
+             pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+        expect(json["errors"]).to eq(["Cluster name can't be blank.", "Cluster name is not included in the list.",
+                                      "DDL statement is invalid (error: table does not exist!)."])
+      end
+
+      it 'returns a 400 status code' do
+        post :create, cluster_name: nil, database: "db1", ddl_statement: "alter table users add column c int",
+             pr_url: "github.com/pr", requestor: "mfinch", final_insert: nil
+        expect(response).to have_http_status(400)
+      end
+    end
+  end
+
+  describe 'POST #approve' do
+    context 'migration exists' do
+      before (:each) do
+        @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                        status: Migration.status_groups["awaiting_approval"],
+                                        ddl_statement: "alter table b add column c int", lock_version: 3)
+        post :approve, id: @migration, approver: "mfinch", runtype: "long", lock_version: 3
+      end
+
+      it 'returns migration as json' do
+        expect(json["migration"]["id"]).to eq(@migration["id"])
+      end
+
+      it 'returns available actions as json' do
+        expect(json["available_actions"]).to eq(["unapprove", "start", "delete", "enqueue"])
+      end
+
+      it 'returns a 200 status code' do
+        expect(response).to have_http_status(200)
+      end
+    end
+
+    context 'migration does not' do
+      before (:each) do
+        post :approve, id: 1234, approver: "mfinch", runtype: "long", lock_version: 3
+      end
+
+      it 'returns an error message as json' do
+        expect(json["errors"]).to eq(["Migration not found."])
+      end
+
+      it 'returns a 404 status code' do
+        expect(response).to have_http_status(404)
+      end
+    end
+
+    context 'invalid action' do
+      before (:each) do
+        @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                        status: Migration.status_groups["awaiting_start"],
+                                        ddl_statement: "alter table b add column c int", lock_version: 3)
+        post :approve, id: @migration, approver: "mfinch", runtype: "long", lock_version: 3
+      end
+
+      it 'returns an error message as json' do
+        expect(json["errors"]).to eq(["Invalid action."])
+      end
+
+      it 'returns a 400 status code' do
+        expect(response).to have_http_status(400)
+      end
+    end
+  end
+
+  # the following actions are almost identical to #approve, so test less
+  describe 'POST #unapprove' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["awaiting_start"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :unapprove, id: @migration, approver: "mfinch", runtype: "long", lock_version: 3
+      expect(json["available_actions"]).to eq(["approve_long", "delete"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["awaiting_approval"])
+    end
+  end
+
+  describe 'POST #start' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["awaiting_start"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :start, id: @migration, lock_version: 3
+      expect(json["available_actions"]).to eq(["pause", "cancel"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["copy_in_progress"])
+      expect(json["migration"]["auto_run"]).to eq(nil)
+    end
+  end
+
+  describe 'POST #enqueue' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["awaiting_start"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :enqueue, id: @migration, lock_version: 3
+      expect(json["available_actions"]).to eq(["dequeue", "delete"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["enqueued"])
+    end
+  end
+
+  describe 'POST #dequeue' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["enqueued"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :dequeue, id: @migration, lock_version: 3
+      expect(json["available_actions"]).to eq(["unapprove", "start", "delete", "enqueue"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["awaiting_start"])
+    end
+  end
+
+  describe 'POST #pause' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["copy_in_progress"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :pause, id: @migration
+      expect(json["available_actions"]).to eq(["cancel"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["pausing"])
+    end
+  end
+
+  describe 'POST #rename' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["awaiting_rename"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :rename, id: @migration, lock_version: 3
+      expect(json["available_actions"]).to eq(["cancel"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["rename_in_progress"])
+    end
+  end
+
+  describe 'POST #resume' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["paused"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :resume, id: @migration, lock_version: 3, auto_run: true
+      expect(json["available_actions"]).to eq(["pause", "cancel"])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["copy_in_progress"])
+      expect(json["migration"]["auto_run"]).to eq(true)
+    end
+  end
+
+  describe 'POST #cancel_cli' do
+    it 'returns valid json' do
+      @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                      status: Migration.status_groups["copy_in_progress"],
+                                      ddl_statement: "alter table b add column c int", lock_version: 3)
+      post :cancel_cli, id: @migration
+      expect(json["available_actions"]).to eq([])
+      expect(json["migration"]["status"]).to eq(Migration.status_groups["canceled"])
+    end
+  end
+
+  describe 'DELETE #destroy' do
+    context 'migration exists' do
+      before (:each) do
+        @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                        status: Migration.status_groups["awaiting_approval"],
+                                        ddl_statement: "alter table b add column c int", lock_version: 3)
+        delete :destroy, id: @migration, lock_version: 3
+      end
+
+      it 'returns empty json' do
+        expect(json).to eq({})
+      end
+
+      it 'returns a 200 status code' do
+        expect(response).to have_http_status(200)
+      end
+    end
+
+    context 'migration does not' do
+      before (:each) do
+        delete :destroy, id: 1234, lock_version: 3
+      end
+
+      it 'returns an error message as json' do
+        expect(json["errors"]).to eq(["Migration not found."])
+      end
+
+      it 'returns a 404 status code' do
+        expect(response).to have_http_status(404)
+      end
+    end
+
+    context 'invalid action' do
+      before (:each) do
+        @migration = FactoryGirl.create(:migration, cluster_name: @cluster.name, initial_runtype: 1,
+                                        status: Migration.status_groups["completed"],
+                                        ddl_statement: "alter table b add column c int", lock_version: 3)
+        delete :destroy, id: @migration, lock_version: 3
+      end
+
+      it 'returns an error message as json' do
+        expect(json["errors"]).to eq(["Invalid action."])
+      end
+
+      it 'returns a 400 status code' do
+        expect(response).to have_http_status(400)
+      end
     end
   end
 end

@@ -142,8 +142,7 @@ class MigrationsController < ApplicationController
     @migration = Migration.find(params[:id])
     authorize @migration
 
-    if @migration.pending? && (params[:lock_version].to_i == @migration.lock_version)
-      @migration.destroy
+    if @migration.delete!(params[:lock_version])
       redirect_to root_url
     else
       redirect_to @migration
