@@ -109,6 +109,59 @@
       </div>
     </div>
 
+    <div>
+      <label class="col-md-3 control-label" rows=2>custom options</label>
+      <div id="custom_options_expand" class="col-md-7">
+        <a data-toggle="collapse" href="#custom_options">
+          <span id="custom_options_expand_icon" class="glyphicon glyphicon-chevron-down"></span>
+          <span id="custom_options_expand_text">expand</span>
+        </a>
+        <div id="custom_options" class="collapse">
+          <div class="form-group">
+            <div class="col-md-4">
+              <%= f.label :max_threads_running, 'max threads running', class: 'control-label', rows: 2%>
+              <span class="help-block">The OSC will abort if threads running reaches this value. Default: 200 threads</span>
+            </div>
+            <div class="col-md-offset-1 col-md-3">
+              <%= f.number_field :max_threads_running, class: 'form-control' %>
+            </div>
+            <label class=" custom-options-units col-md-3 control-label">threads</label>
+          </div>
+
+          <div class="form-group">
+            <div class="col-md-4">
+              <%= f.label :max_replication_lag, 'max replication lag', class: 'control-label', rows: 2%>
+              <span class="help-block">The OSC will pause until every replica's lag is less than this value. Default: 1 second</span>
+            </div>
+            <div class="col-md-offset-1 col-md-3">
+              <%= f.number_field :max_replication_lag, class: 'form-control' %>
+            </div>
+            <label class="custom-options-units col-md-3 control-label">seconds</label>
+          </div>
+
+          <div class="form-group custom-options-hidden">
+            <div class="col-md-4">
+              <%= f.label :config_path, 'config path', class: 'control-label', rows: 2%>
+              <span class="help-block"></span>
+            </div>
+            <div class="col-md-offset-1 col-md-5">
+              <%= f.text_field :config_path, class: 'form-control' %>
+            </div>
+          </div>
+
+          <div class="form-group custom-options-hidden">
+            <div class="col-md-4">
+              <%= f.label :recursion_method, 'recursion method', class: 'control-label', rows: 2%>
+              <span class="help-block"></span>
+            </div>
+            <div class="col-md-offset-1 col-md-5">
+              <%= f.text_field :recursion_method, class: 'form-control' %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <% if @migration.dao %>
       <%= f.hidden_field :lock_version, :value => @migration.dao.lock_version %>
     <% end %>

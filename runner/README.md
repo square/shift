@@ -28,6 +28,7 @@ This is a sample payload that the shift api will expose (just one migration here
   "run_host":null,
   "mode":0,
   "action":2,
+  "custom_options": "{\"max_threads_running\": \"200\", \"max_replication_lag\":\"1\"}"
 }]
 ```
 

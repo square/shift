@@ -8,8 +8,12 @@ module Form
       ATTRIBUTES.each do |attr|
         if params.has_key?(attr.to_s) && mutable?(attr.to_s)
           self.send("#{attr}=", params[attr.to_s])
-        else
+        elsif dao.has_attribute?(attr.to_s)
+          # accesses ActiveRecord attributes
           self.send("#{attr}=", dao[attr.to_s])
+        else
+          # accesses non persistent instance variables (custom options)
+          self.send("#{attr}=", dao.instance_variable_get("@#{attr.to_s}"))
         end
       end
     end
@@ -34,6 +38,10 @@ module Form
         error_message: nil,
         runtype: Migration.types[:run][:undecided],
         initial_runtype: initial_runtype,
+        max_threads_running: max_threads_running,
+        max_replication_lag: max_replication_lag,
+        config_path: config_path,
+        recursion_method: recursion_method,
       )
     end
 
@@ -44,7 +52,7 @@ module Form
     private
 
     def mutable?(attr)
-      %w(cluster_name database table ddl_statement pr_url requestor final_insert).include?(attr)
+      %w(cluster_name database table ddl_statement pr_url requestor final_insert max_threads_running max_replication_lag config_path recursion_method).include?(attr)
     end
   end
 end

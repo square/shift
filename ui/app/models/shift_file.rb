@@ -14,6 +14,8 @@ class ShiftFile < ActiveRecord::Base
     FILE_TYPES
   end
 
+  private
+
   def compress_contents
     unless self.contents == nil
       self.contents = ActiveSupport::Gzip.compress(contents)

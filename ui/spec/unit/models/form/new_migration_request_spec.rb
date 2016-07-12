@@ -16,11 +16,15 @@ RSpec.describe Form::NewMigrationRequest do
 
   def build(extra = {})
     described_class.new({
-      cluster_name:  "appname-001",
-      database:      "test",
-      ddl_statement: "ALTER TABLE users DROP COLUMN `c`",
-      pr_url:        "github.com/pr",
-      final_insert:  "INSERT INTO schema_migrations",
+      cluster_name:        "appname-001",
+      database:            "test",
+      ddl_statement:       "ALTER TABLE users DROP COLUMN `c`",
+      pr_url:              "github.com/pr",
+      max_threads_running: "123",
+      max_replication_lag: "5",
+      config_path:         "/path/to/file",
+      recursion_method:    "string here",
+      final_insert:        "INSERT INTO schema_migrations",
     }.merge(extra).with_indifferent_access)
   end
 
@@ -65,6 +69,18 @@ RSpec.describe Form::NewMigrationRequest do
       expect(request.valid?).to eq(false)
       expect(request).to have_error_on(:pr_url)
     end
+
+    it 'validates positive integerness of max threads running' do
+      request = build(max_threads_running: -1)
+      expect(request.valid?).to eq(false)
+      expect(request).to have_error_on(:max_threads_running)
+    end
+
+    it 'validates positive integerness of max replication lag' do
+      request = build(max_replication_lag: -1)
+      expect(request.valid?).to eq(false)
+      expect(request).to have_error_on(:max_replication_lag)
+    end
   end
 
   describe '#save' do
@@ -80,15 +96,19 @@ RSpec.describe Form::NewMigrationRequest do
 
     it 'saves record and returns true' do
       expect(dao).to receive(:create!).with(
-        cluster_name:    "appname-001",
-        database:        "test",
-        ddl_statement:   "ALTER TABLE users DROP COLUMN `c`",
-        pr_url:          "github.com/pr",
-        final_insert:    "INSERT INTO schema_migrations",
-        requestor:       nil,
-        meta_request_id: nil,
-        runtype:         0,
-        initial_runtype: 1,
+        cluster_name:         "appname-001",
+        database:             "test",
+        ddl_statement:        "ALTER TABLE users DROP COLUMN `c`",
+        pr_url:               "github.com/pr",
+        final_insert:         "INSERT INTO schema_migrations",
+        requestor:            nil,
+        meta_request_id:      nil,
+        runtype:              0,
+        initial_runtype:      1,
+        max_threads_running: "123",
+        max_replication_lag: "5",
+        config_path:         "/path/to/file",
+        recursion_method:    "string here",
       )
       build.save
     end

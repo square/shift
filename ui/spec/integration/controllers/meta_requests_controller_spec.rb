@@ -20,6 +20,8 @@ RSpec.describe MetaRequestsController, type: :controller do
       :ddl_statement => 'ALTER TABLE users DROP COLUMN `c`',
       :pr_url        => 'github.com/pr',
       :final_insert  => 'INSERT INTO schema_migrations',
+      :max_threads_running => "123",
+      :max_replication_lag => "5",
     }.merge(extra).with_indifferent_access
   end
 
@@ -107,15 +109,21 @@ RSpec.describe MetaRequestsController, type: :controller do
       it 'populates a saved_state hash' do
         get :new, {
           :ddl_statement => "alter table", :final_insert => "insert into",
-          :pr_url => "github.com", :databases => ["cluster-001:db1", "cluster-001:db2"]
+          :pr_url => "github.com", :databases => ["cluster-001:db1", "cluster-001:db2"],
+          :max_threads_running => "123", :max_replication_lag => "5", :config_path => "/path/to/file",
+          :recursion_method => "some string",
         }
         expect(assigns(:saved_state)).to eq({
-          :ddl_statement => "alter table",
-          :final_insert  => "insert into",
-          :pr_url        => "github.com",
-          :cluster_dbs   => {
-            "cluster-001" => ["db1", "db2"]
-          }
+          :ddl_statement       => "alter table",
+          :final_insert        => "insert into",
+          :pr_url              => "github.com",
+          :cluster_dbs         => {
+            "cluster-001"      => ["db1", "db2"]
+          },
+          :max_threads_running => "123",
+          :max_replication_lag => "5",
+          :config_path         => "/path/to/file",
+          :recursion_method    => "some string",
         })
       end
     end
@@ -311,10 +319,14 @@ RSpec.describe MetaRequestsController, type: :controller do
 
       it 'populates a saved state hash' do
         expected = {
-          :ddl_statement => valid_attributes[:ddl_statement],
-          :final_insert  => valid_attributes[:final_insert],
-          :pr_url        => valid_attributes[:pr_url],
-          :cluster_dbs   => {"appname-001" => ["test"], "otherapp-001" => ["test"]},
+          :ddl_statement       => valid_attributes[:ddl_statement],
+          :final_insert        => valid_attributes[:final_insert],
+          :pr_url              => valid_attributes[:pr_url],
+          :cluster_dbs         => {"appname-001" => ["test"], "otherapp-001" => ["test"]},
+          :max_threads_running => "123",
+          :max_replication_lag => "5",
+          :config_path         => nil,
+          :recursion_method    => nil,
         }
         post :create, valid_attributes(:databases => ["appname-001:test", "otherapp-001:test"])
         expect(assigns(:saved_state)).to eq(expected)
@@ -356,10 +368,14 @@ RSpec.describe MetaRequestsController, type: :controller do
 
       it 'populates a saved state hash' do
         expected = {
-          :ddl_statement => valid_attributes[:ddl_statement],
-          :final_insert  => valid_attributes[:final_insert],
-          :pr_url        => valid_attributes[:pr_url],
-          :cluster_dbs   => {"appname-001" => []},
+          :ddl_statement       => valid_attributes[:ddl_statement],
+          :final_insert        => valid_attributes[:final_insert],
+          :pr_url              => valid_attributes[:pr_url],
+          :cluster_dbs         => {"appname-001" => []},
+          :max_threads_running => "123",
+          :max_replication_lag => "5",
+          :config_path         => nil,
+          :recursion_method    => nil,
         }
         post :create, valid_attributes(databases: nil)
         expect(assigns(:saved_state)).to eq(expected)
@@ -400,10 +416,14 @@ RSpec.describe MetaRequestsController, type: :controller do
 
       it 'populates a saved state hash' do
         expected = {
-          :ddl_statement => "blah",
-          :final_insert  => valid_attributes[:final_insert],
-          :pr_url        => valid_attributes[:pr_url],
-          :cluster_dbs   => {"appname-001" => ["test", "db1"]},
+          :ddl_statement       => "blah",
+          :final_insert        => valid_attributes[:final_insert],
+          :pr_url              => valid_attributes[:pr_url],
+          :cluster_dbs         => {"appname-001" => ["test", "db1"]},
+          :max_threads_running => "123",
+          :max_replication_lag => "5",
+          :config_path         => nil,
+          :recursion_method    => nil,
         }
         post :create, valid_attributes(ddl_statement: "blah")
         expect(assigns(:saved_state)).to eq(expected)
@@ -432,9 +452,13 @@ RSpec.describe MetaRequestsController, type: :controller do
 
     it 'populates a saved state hash' do
       expected = {
-        :ddl_statement => @meta_request.ddl_statement,
-        :final_insert  => @meta_request.final_insert,
-        :pr_url        => @meta_request.pr_url,
+        :ddl_statement       => @meta_request.ddl_statement,
+        :final_insert        => @meta_request.final_insert,
+        :pr_url              => @meta_request.pr_url,
+        :max_threads_running => @meta_request.max_threads_running,
+        :max_replication_lag => @meta_request.max_replication_lag,
+        :config_path         => @meta_request.config_path,
+        :recursion_method    => @meta_request.recursion_method,
       }
       expect(assigns(:saved_state)).to eq(expected)
     end
@@ -504,16 +528,20 @@ RSpec.describe MetaRequestsController, type: :controller do
 
       it 'populates a saved state hash' do
         expected = {
-          :ddl_statement => "do something else",
-          :final_insert  => nil,
-          :pr_url        => nil,
+          :ddl_statement       => nil,
+          :final_insert        => nil,
+          :pr_url              => "github.com/pr",
+          :max_threads_running => "200",
+          :max_replication_lag => "1",
+          :config_path         => nil,
+          :recursion_method    => nil,
         }
-        patch :update, id: @meta_request, ddl_statement: "do something else"
+        patch :update, id: @meta_request, ddl_statement: nil
         expect(assigns(:saved_state)).to eq(expected)
       end
 
       it 'redirects to the edit page' do
-        patch :update, id: @meta_request, ddl_statement: "do something else"
+        patch :update, id: @meta_request, ddl_statement: nil
         expect(response).to render_template(:edit)
       end
     end

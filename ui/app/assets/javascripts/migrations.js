@@ -196,6 +196,16 @@ $(document).ready(function() {
         };
     });
 
+    $("#custom_options").on('shown.bs.collapse', function() {
+        $("#custom_options_expand_icon").removeClass("glyphicon-chevron-down").addClass("glyphicon-chevron-up")
+        $("#custom_options_expand_text").text("collapse")
+    })
+
+    $("#custom_options").on('hidden.bs.collapse', function() {
+        $("#custom_options_expand_icon").removeClass("glyphicon-chevron-up").addClass("glyphicon-chevron-down")
+        $("#custom_options_expand_text").text("expand")
+    })
+
     $("#migration_request_submit").click(function(event){
       alertOnDdl("_migration_request_ddl_statement", "submit-migration-form")
     });

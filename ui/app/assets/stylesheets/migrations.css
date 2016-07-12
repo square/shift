@@ -201,8 +201,28 @@
 .new-bubble {
   background-color: #f19834;
   color: white;
-  padding:4px;
+  padding: 4px;
   border-radius: 5px;
+}
+
+#custom_options_expand {
+  padding-top: 7px;
+  padding-bottom: 40px;
+}
+#custom_options_expand a {
+  text-decoration: none;
+}
+
+#custom_options {
+  padding-top: 5px;
+}
+
+.custom-options-units {
+  text-align: left !important;
+}
+
+.custom-options-hidden {
+  display: none;
 }
 
 .popover {

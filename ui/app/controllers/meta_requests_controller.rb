@@ -141,10 +141,20 @@ class MetaRequestsController < ApplicationController
   end
 
   def new
+    # some form defaults
+    max_threads_running = params[:max_threads_running] || 200
+    max_replication_lag = params[:max_replication_lag] || 1
+    config_path = params[:config_path]
+    recursion_method = params[:recursion_method]
+
     @saved_state = {
-      :ddl_statement => params[:ddl_statement],
-      :final_insert  => params[:final_insert],
-      :pr_url        => params[:pr_url],
+      :ddl_statement       => params[:ddl_statement],
+      :final_insert        => params[:final_insert],
+      :pr_url              => params[:pr_url],
+      :max_threads_running => max_threads_running,
+      :max_replication_lag => max_replication_lag,
+      :config_path         => config_path,
+      :recursion_method    => recursion_method,
       :cluster_dbs   => (params[:databases] || []).map {|cluster_db| cluster_db.split ':'}
         .inject({}) { |h, cluster_db| (h[cluster_db[0]] ||= []) << cluster_db[1]; h }
     }
@@ -157,6 +167,10 @@ class MetaRequestsController < ApplicationController
     pr_url = params[:pr_url]
     databases = params[:databases]
     clusters = params[:clusters]
+    max_threads_running = params[:max_threads_running]
+    max_replication_lag = params[:max_replication_lag]
+    config_path = params[:config_path]
+    recursion_method = params[:recursion_method]
     no_errors = []
     errors = []
 
@@ -193,13 +207,17 @@ class MetaRequestsController < ApplicationController
         end
 
         migration = Form::NewMigrationRequest.new({
-          "cluster_name"  => cluster_name,
-          "database"      => database,
-          "ddl_statement" => ddl_statement,
-          "pr_url"        => pr_url,
-          "requestor"     => current_user_name,
-          "final_insert"  => final_insert,
-          "runtype"       => Migration.types[:run][:undecided],
+          "cluster_name"        => cluster_name,
+          "database"            => database,
+          "ddl_statement"       => ddl_statement,
+          "pr_url"              => pr_url,
+          "requestor"           => current_user_name,
+          "final_insert"        => final_insert,
+          "max_threads_running" => max_threads_running,
+          "max_replication_lag" => max_replication_lag,
+          "config_path"         => config_path,
+          "recursion_method"    => recursion_method,
+          "runtype"             => Migration.types[:run][:undecided],
         })
         if migration.validate
           no_errors << migration
@@ -210,10 +228,14 @@ class MetaRequestsController < ApplicationController
 
       if errors.length <= 0
         mr = MetaRequest.new({
-          :ddl_statement => ddl_statement,
-          :final_insert  => final_insert,
-          :pr_url        => pr_url,
-          :requestor     => current_user_name,
+          :ddl_statement       => ddl_statement,
+          :final_insert        => final_insert,
+          :pr_url              => pr_url,
+          :requestor           => current_user_name,
+          :max_threads_running => max_threads_running,
+          :max_replication_lag => max_replication_lag,
+          :config_path         => config_path,
+          :recursion_method    => recursion_method,
         })
         if mr.save
           no_errors.each { |m| m.meta_request_id = mr.id; m.save }
@@ -247,9 +269,13 @@ class MetaRequestsController < ApplicationController
     @errors = errors
     # save the current state so that the form can be auto-populated when we refresh
     @saved_state = {
-      :ddl_statement => ddl_statement,
-      :final_insert  => final_insert,
-      :pr_url        => pr_url,
+      :ddl_statement       => ddl_statement,
+      :final_insert        => final_insert,
+      :pr_url              => pr_url,
+      :max_threads_running => max_threads_running,
+      :max_replication_lag => max_replication_lag,
+      :config_path         => config_path,
+      :recursion_method    => recursion_method,
       :cluster_dbs   => {},
     }
     @errors.each do |error|
@@ -266,24 +292,36 @@ class MetaRequestsController < ApplicationController
 
   def edit
     @meta_request = MetaRequest.find(params[:id])
+    max_threads_running = @meta_request.max_threads_running || 200
+    max_replication_lag = @meta_request.max_replication_lag || 1
     @saved_state = {
-      :ddl_statement => @meta_request.ddl_statement,
-      :final_insert  => @meta_request.final_insert,
-      :pr_url        => @meta_request.pr_url,
+      :ddl_statement       => @meta_request.ddl_statement,
+      :final_insert        => @meta_request.final_insert,
+      :pr_url              => @meta_request.pr_url,
+      :max_threads_running => max_threads_running,
+      :max_replication_lag => max_replication_lag,
+      :config_path         => @meta_request.config_path,
+      :recursion_method    => @meta_request.recursion_method,
     }
   end
 
   def update
     @errors = []
-    updated = {
-      "ddl_statement" => params[:ddl_statement],
-      "pr_url"        => params[:pr_url],
-      "final_insert"  => params[:final_insert],
-      "requestor"     => current_user_name,
-    }
-
+    updatable = ["ddl_statement", "pr_url", "final_insert", "max_threads_running", "max_replication_lag",
+      "config_path", "recursion_method", "requestor"]
+    updated = {}
     ActiveRecord::Base.transaction do
       @meta_request = MetaRequest.lock.find(params[:id])
+
+      updatable.each do |k|
+        if params.key?(k)
+          updated[k] = params[k]
+        elsif @meta_request.has_attribute?(k)
+          updated[k] = @meta_request.read_attribute(k)
+        else
+          updated[k] = @meta_request.instance_variable_get("@#{k}")
+        end
+      end
 
       @meta_request.assign_attributes(updated)
       # if we could update the meta request, try to update all the migrations that
@@ -330,9 +368,13 @@ class MetaRequestsController < ApplicationController
 
     # save the current state so that the form can be auto-populated when we refresh
     @saved_state = {
-      :ddl_statement => updated["ddl_statement"],
-      :final_insert  => updated["final_insert"],
-      :pr_url        => updated["pr_url"],
+      :ddl_statement       => updated["ddl_statement"],
+      :final_insert        => updated["final_insert"],
+      :pr_url              => updated["pr_url"],
+      :max_threads_running => updated["max_threads_running"],
+      :max_replication_lag => updated["max_replication_lag"],
+      :config_path         => updated["config_path"],
+      :recursion_method    => updated["recursion_method"],
     }
 
     # display errors
