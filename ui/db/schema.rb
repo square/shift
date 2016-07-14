@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20160606143900) do
+ActiveRecord::Schema.define(version: 20160701171400) do
 
   create_table "clusters", force: :cascade do |t|
     t.string  "name",                  limit: 255
@@ -35,12 +35,13 @@ ActiveRecord::Schema.define(version: 20160606143900) do
   add_index "comments", ["migration_id"], name: "index_comments_on_migration_id", using: :btree
 
   create_table "meta_requests", force: :cascade do |t|
-    t.text     "ddl_statement", limit: 65535, null: false
-    t.text     "final_insert",  limit: 65535
-    t.string   "requestor",     limit: 255,   null: false
-    t.string   "pr_url",        limit: 255,   null: false
-    t.datetime "created_at",                  null: false
-    t.datetime "updated_at",                  null: false
+    t.text     "ddl_statement",  limit: 65535, null: false
+    t.text     "final_insert",   limit: 65535
+    t.string   "requestor",      limit: 255,   null: false
+    t.string   "pr_url",         limit: 255,   null: false
+    t.datetime "created_at",                   null: false
+    t.datetime "updated_at",                   null: false
+    t.binary   "custom_options", limit: 65535
   end
 
   create_table "migrations", force: :cascade do |t|
@@ -74,6 +75,7 @@ ActiveRecord::Schema.define(version: 20160606143900) do
     t.integer  "meta_request_id",  limit: 4
     t.integer  "initial_runtype",  limit: 1,     default: 0
     t.boolean  "auto_run",                       default: false
+    t.binary   "custom_options",   limit: 65535
   end
 
   add_index "migrations", ["status"], name: "index_migrations_on_status", using: :btree

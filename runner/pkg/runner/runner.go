@@ -4,6 +4,7 @@ package runner
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -289,6 +290,11 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			}
 		}
 
+		customOptions := make(map[string]string)
+		if val, ok := currentMigration["custom_options"]; ok && val != nil {
+			json.Unmarshal([]byte(currentMigration["custom_options"].(string)), &customOptions)
+		}
+
 		// log and statefiles are stored in log directory. ex for mig with id 7: /path/to/logs/statefile-id-7.txt
 		filesDir := runner.LogDir + "id-" + strconv.Itoa(int(migrationIdField)) + "/"
 		stateFile := filesDir + "statefile.txt"
@@ -307,6 +313,7 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			StateFile:      stateFile,
 			LogFile:        logFile,
 			PendingDropsDb: runner.PendingDropsDb,
+			CustomOptions:  customOptions,
 		}
 
 		// some extra fields when we're not killing a migration
@@ -882,15 +889,41 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 	alterPrefixRegex := regexp.MustCompile("^(?i)(ALTER\\s+TABLE\\s+.*?\\s+)")
 	alterStatement := alterPrefixRegex.ReplaceAllLiteralString(currentMigration.DdlStatement, "")
 
+	// set options that don't exist with the defaults
+	var customOptions map[string]string
+	defaultOptions := map[string]string{
+		"max_threads_running": "200",
+		"max_replication_lag": "1",
+		"config_path":         "",
+		"recursion_method":    "",
+	}
+	if currentMigration.CustomOptions == nil {
+		customOptions = defaultOptions
+	} else {
+		customOptions = currentMigration.CustomOptions
+		for k, v := range defaultOptions {
+			if _, ok := customOptions[k]; !ok {
+				customOptions[k] = v
+			}
+		}
+	}
+
 	dsn := fmt.Sprintf("D=%s,t=%s", currentMigration.Database, currentMigration.Table)
+	commandOptions = make([]string, 0)
 
 	if currentMigration.Status == migration.PrepMigrationStatus {
-		commandOptions = []string{"--alter", alterStatement, "--dry-run", "-h", currentMigration.Host,
-			"--defaults-file", runner.MysqlDefaultsFile, dsn}
+		commandOptions = append(commandOptions, "--alter", alterStatement, "--dry-run", "-h", currentMigration.Host,
+			"--defaults-file", runner.MysqlDefaultsFile, dsn)
 	} else if currentMigration.Status == migration.RunMigrationStatus {
-		commandOptions = []string{"--alter", alterStatement, "--execute", "-h", currentMigration.Host,
+		// specify config file if it is defined. Options specified via command line should overwrite
+		// ones specified in the config file
+		if len(customOptions["config_path"]) > 0 {
+			commandOptions = append(commandOptions, "--config", customOptions["config_path"])
+		}
+
+		commandOptions = append(commandOptions, "--alter", alterStatement, "--execute", "-h", currentMigration.Host,
 			"--defaults-file", runner.MysqlDefaultsFile, "--progress", ptOscProgress, "--exit-at", "copy",
-			"--save-state", currentMigration.StateFile}
+			"--save-state", currentMigration.StateFile)
 
 		// if the statefile already exists, we must be resuming the migration. load
 		// up the previous state
@@ -902,8 +935,15 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 			commandOptions = append(commandOptions, "--nocheck-alter")
 		}
 
-		commandOptions = append(commandOptions, "--max-load", "Threads_running=125",
-			"--critical-load", "Threads_running=200", "--tries", "create_triggers:200:1,copy_rows:10000:1",
+		if len(customOptions["recursion_method"]) > 0 {
+			commandOptions = append(commandOptions, "--recursion-method", customOptions["recursion_method"])
+		}
+
+		commandOptions = append(commandOptions,
+			"--max-load", "Threads_running=125",
+			"--critical-load", "Threads_running="+customOptions["max_threads_running"],
+			"--tries", "create_triggers:200:1,copy_rows:10000:1",
+			"--max-lag", customOptions["max_replication_lag"],
 			"--set-vars", "wait_timeout=600,lock_wait_timeout=1", dsn)
 	}
 	return

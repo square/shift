@@ -28,6 +28,8 @@ FactoryGirl.define do
     ddl_statement "alter table test_table drop column c1"
     pr_url "github.com/pr"
     requestor "developer"
+    max_threads_running "200"
+    max_replication_lag "1"
   end
 
   factory :meta_request do
@@ -38,6 +40,8 @@ FactoryGirl.define do
     pr_url "github.com/pr"
     final_insert nil
     requestor "developer"
+    max_threads_running "200"
+    max_replication_lag "1"
   end
 
   factory :shift_file do

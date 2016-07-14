@@ -62,6 +62,8 @@ module Form
     validates_presence_of :database
     validates_presence_of :ddl_statement
     validates_presence_of :pr_url
+    validates_numericality_of :max_threads_running, greater_than: 0
+    validates_numericality_of :max_replication_lag, greater_than: 0
     # don't allow semicolons anywhere
     validates_format_of :database, :with => /\A[^;]+\Z/
 
@@ -78,12 +80,17 @@ module Form
       dao.to_param
     end
 
+    # TODO: find a better way to add attributes, right now you have to add stuff in like 10 places
     ATTRIBUTES = [
       :cluster_name,
       :database,
       :table,
       :ddl_statement,
       :pr_url,
+      :max_threads_running,
+      :max_replication_lag,
+      :config_path,
+      :recursion_method,
       :requestor,
       :final_insert,
       :meta_request_id,

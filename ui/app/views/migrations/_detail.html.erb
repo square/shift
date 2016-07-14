@@ -8,7 +8,9 @@
     <% end %>
     <%= link_to "Clone", new_migration_path(:cluster_name => @migration.cluster_name, :database => @migration.database,
                                             :ddl_statement => @migration.ddl_statement, :pr_url => @migration.pr_url,
-                                            :final_insert => @migration.final_insert), class: 'btn btn-default' %>
+                                            :final_insert => @migration.final_insert, :max_threads_running => @migration.max_threads_running,
+                                            :max_replication_lag => @migration.max_replication_lag, :config_path => @migration.config_path,
+                                            :recursion_method => @migration.recursion_method), class: 'btn btn-default' %>
   </div>
 </h2>
 <hr>

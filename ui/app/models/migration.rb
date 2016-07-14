@@ -2,7 +2,9 @@ class Migration < ActiveRecord::Base
   has_many :comments
   belongs_to :meta_requests
   paginates_per 20
-  attr_accessor :actions
+  before_save :encodeCustomOptions
+  after_initialize :decodeCustomOptions
+  attr_accessor :actions, :max_threads_running, :max_replication_lag, :config_path, :recursion_method
 
   belongs_to :cluster, foreign_key: "cluster_name", primary_key: "name"
 
@@ -432,6 +434,30 @@ class Migration < ActiveRecord::Base
       end
     else
       []
+    end
+  end
+
+  private
+
+  def encodeCustomOptions
+    self.custom_options = ActiveSupport::JSON.encode(max_threads_running: self.max_threads_running,
+                                                     max_replication_lag: self.max_replication_lag,
+                                                     config_path: self.config_path,
+                                                     recursion_method: self.recursion_method)
+  end
+
+  def decodeCustomOptions
+    if !self.has_attribute?(:custom_options)
+      # prevents MissingAttributeError when doing selects
+      return
+    end
+
+    if self.custom_options != nil
+      decodedOptions = ActiveSupport::JSON.decode(self.custom_options)
+      self.max_threads_running = decodedOptions["max_threads_running"]
+      self.max_replication_lag = decodedOptions["max_replication_lag"]
+      self.config_path = decodedOptions["config_path"]
+      self.recursion_method = decodedOptions["recursion_method"]
     end
   end
 end

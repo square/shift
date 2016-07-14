@@ -107,6 +107,7 @@ type Migration struct {
 	Mode           int
 	Action         int
 	PendingDropsDb string
+	CustomOptions  map[string]string
 }
 
 type TableStats struct {
