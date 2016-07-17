@@ -138,7 +138,8 @@ $ shift-client get migration --id 25
     "runtype": 1,
     "meta_request_id": null,
     "initial_runtype": 1,
-    "auto_run": true
+    "auto_run": true,
+    "custom_options": "{\"max_threads_running\":200,\"max_replication_lag\":1,\"config_path\":\"\",\"recursion_method\":\"\"}"
   },
   "available_actions": [
     "pause",
