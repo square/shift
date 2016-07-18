@@ -16,14 +16,17 @@ class ShiftClient
     shift_get("/api/v1/migrations/#{migration_id}")
   end
 
-  def create_migration(cluster, database, ddl_statement, pr_url, requestor, final_insert: nil)
+  def create_migration(cluster, database, ddl_statement, pr_url, requestor, final_insert: nil,
+                      config_path: nil, recursion_method: nil)
     params = {
-      :cluster_name  => cluster,
-      :database      => database,
-      :ddl_statement => ddl_statement,
-      :pr_url        => pr_url,
-      :requestor     => requestor,
-      :final_insert  => final_insert || "",
+      :cluster_name     => cluster,
+      :database         => database,
+      :ddl_statement    => ddl_statement,
+      :pr_url           => pr_url,
+      :requestor        => requestor,
+      :final_insert     => final_insert || "",
+      :config_path      => config_path || "",
+      :recursion_method => recursion_method || "",
     }
 
     shift_post("/api/v1/migrations", params)

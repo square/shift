@@ -17,9 +17,9 @@ class ShiftClientCLI
   DEFAULT_SHIFT_URL = "http://localhost:3000"
 
   global_option "--url URL", String, "The API URL for shift (default: #{DEFAULT_SHIFT_URL})"
-  global_option "--ssl-cert SSL CERT", String, "An SSL cert for authenticating against the shift api"
-  global_option "--ssl-key SSL KEY", String, "An SSL key for authenticating against the shift api"
-  global_option "--ssl-ca SSL CA", String, "An SSL CA cert for authenticating against the shift api"
+  global_option "--ssl-cert SSL CERT", String, "An SSL cert for authenticating against the shift api (optional)"
+  global_option "--ssl-key SSL KEY", String, "An SSL key for authenticating against the shift api (optional)"
+  global_option "--ssl-ca SSL CA", String, "An SSL CA cert for authenticating against the shift api (optional)"
 
   def run
     command :'get migration' do |get_migration|
@@ -43,7 +43,11 @@ class ShiftClientCLI
       create_migration.option "--ddl-statement DDL STATEMENT", String, "The ddl statement to run"
       create_migration.option "--pr-url PR URL", String, "The pull request URL associated with the migration"
       create_migration.option "--requestor REQUESTOR", String, "Username of the person creating the migration"
-      create_migration.option "--final-insert FINAL INSERT", String, "A final insert statement"
+      create_migration.option "--final-insert FINAL INSERT", String, "A final insert statement (optional)"
+      # optional pt-osc params. TODO: make this better
+      create_migration.option "--config-path CONFIG PATH", String, "Path to config file for pt-osc. This file must " +
+                                                                   "live on the same host as the shift runner (optional)"
+      create_migration.option "--recursion-method RECURSION METHOD", String, "Recursion method for pt-osc (optional)"
 
       create_migration.action do |args, options|
         raise "Must provide --cluster" unless options.cluster
@@ -53,7 +57,9 @@ class ShiftClientCLI
         raise "Must provide --requestor" unless options.requestor
 
         client = shift_client_with_auth(options)
-        display client.create_migration(options.cluster, options.database, options.ddl_statement, options.pr_url, options.requestor, final_insert: options.final_insert)
+        display client.create_migration(options.cluster, options.database, options.ddl_statement,
+                                        options.pr_url, options.requestor, final_insert: options.final_insert,
+                                        config_path: options.config_path, recursion_method: options.recursion_method)
       end
     end
 
@@ -72,7 +78,7 @@ class ShiftClientCLI
           c.option "--approver APPROVER", String, "The username of the approver"
         end
         if %w(start resume).include?(action)
-          c.option "--auto-run", String, "If passed, this migration will automatically rename tables after completing the copy step"
+          c.option "--auto-run", String, "If passed, this migration will automatically rename tables after completing the copy step (optional)"
         end
 
         c.action do |args, options|

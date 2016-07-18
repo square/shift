@@ -13,6 +13,8 @@ describe ShiftClient do
   let(:pr_url) { "github.com/pr" }
   let(:requestor) { "michael" }
   let(:final_insert) { "" }
+  let(:config_path) { "" }
+  let(:recursion_method) { "" }
   let(:lock_version) { 7 }
   let(:runtype) { "long" }
   let(:approver) { "frank" }
@@ -28,18 +30,19 @@ describe ShiftClient do
   it "#create_migration" do
     path = shift_client.url + "/api/v1/migrations"
     params = {
-      :cluster_name  => cluster,
-      :database      => database,
-      :ddl_statement => ddl_statement,
-      :pr_url        => pr_url,
-      :requestor     => requestor,
-      :final_insert  => final_insert,
+      :cluster_name     => cluster,
+      :database         => database,
+      :ddl_statement    => ddl_statement,
+      :pr_url           => pr_url,
+      :requestor        => requestor,
+      :final_insert     => final_insert,
+      :config_path      => config_path,
+      :recursion_method => recursion_method,
     }
     resource_double = instance_double(RestClient::Resource)
     expect(RestClient::Resource).to receive(:new).with(path, {}).and_return(resource_double)
     expect(resource_double).to receive(:post).with(params.to_json, post_headers).and_return("{}")
-    expect(shift_client.create_migration(
-      cluster, database, ddl_statement, pr_url, requestor)).to eq({})
+    expect(shift_client.create_migration(cluster, database, ddl_statement, pr_url, requestor)).to eq({})
   end
 
   it "#generic_migration_action_post" do

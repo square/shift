@@ -915,10 +915,17 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 		commandOptions = append(commandOptions, "--alter", alterStatement, "--dry-run", "-h", currentMigration.Host,
 			"--defaults-file", runner.MysqlDefaultsFile, dsn)
 	} else if currentMigration.Status == migration.RunMigrationStatus {
-		// specify config file if it is defined. Options specified via command line should overwrite
+		// specify config file if it is defined. Options specified via command line will overwrite
 		// ones specified in the config file
 		if len(customOptions["config_path"]) > 0 {
 			commandOptions = append(commandOptions, "--config", customOptions["config_path"])
+		} else {
+			commandOptions = append(commandOptions,
+				"--max-load", "Threads_running=125",
+				"--critical-load", "Threads_running="+customOptions["max_threads_running"],
+				"--tries", "create_triggers:200:1,copy_rows:10000:1",
+				"--max-lag", customOptions["max_replication_lag"],
+				"--set-vars", "wait_timeout=600,lock_wait_timeout=1")
 		}
 
 		commandOptions = append(commandOptions, "--alter", alterStatement, "--execute", "-h", currentMigration.Host,
@@ -939,12 +946,7 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 			commandOptions = append(commandOptions, "--recursion-method", customOptions["recursion_method"])
 		}
 
-		commandOptions = append(commandOptions,
-			"--max-load", "Threads_running=125",
-			"--critical-load", "Threads_running="+customOptions["max_threads_running"],
-			"--tries", "create_triggers:200:1,copy_rows:10000:1",
-			"--max-lag", customOptions["max_replication_lag"],
-			"--set-vars", "wait_timeout=600,lock_wait_timeout=1", dsn)
+		commandOptions = append(commandOptions, dsn)
 	}
 	return
 }
