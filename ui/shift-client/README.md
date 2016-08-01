@@ -6,7 +6,9 @@ Installation
 ------
 Run the shift-client executable directly
 ```
-./shift/ui/shift-client/bin/shift-client --help
+cd shift/ui/shift-client
+bundle install
+./bin/shift-client --help
 ```
 Or install it directly
 ```
