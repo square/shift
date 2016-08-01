@@ -522,12 +522,16 @@ RSpec.describe MigrationsController, type: :controller do
         login(admin: true)
 
         @migration = FactoryGirl.create(:approval_migration, cluster_name: @cluster.name)
-        post :approve, id: @migration, lock_version: @migration.lock_version
+        post :approve, id: @migration, lock_version: @migration.lock_version, runtype: 1
         @migration.reload
       end
 
       it 'approves the migration' do
         expect(@migration.status).to eq(statuses[:awaiting_start])
+      end
+
+      it 'sets the runtype' do
+        expect(@migration.runtype).to eq(1)
       end
 
       it 'redirects to the current migration' do
