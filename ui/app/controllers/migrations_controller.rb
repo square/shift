@@ -164,7 +164,7 @@ class MigrationsController < ApplicationController
       authorize @migration, :approve_dangerous?
     end
 
-    if @migration.approve!(current_user_name, params[:runtype], params[:lock_version])
+    if @migration.approve!(current_user_name, params[:runtype].to_i, params[:lock_version])
       @migration.reload
       send_notifications
     end
