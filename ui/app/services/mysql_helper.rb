@@ -11,12 +11,7 @@ end
 class MysqlHelper
   def initialize(cluster_name)
     @cluster = Cluster.find_by(:name => cluster_name)
-    @host =
-      if Rails.env.staging? || Rails.env.production?
-        @cluster.rw_host
-      elsif Rails.env.test? || Rails.env.development?
-        'localhost'
-      end
+	@host = @cluster.rw_host
 
     # obsolete cluster
 
