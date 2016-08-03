@@ -204,16 +204,18 @@ class Migration < ActiveRecord::Base
     updated == 1
   end
 
+  # return an arry - first element is a bool of whether or not the migration was
+  # started, second element is a bool of whether or not the cluster was maxed out
   def start!(lock_version, auto_run = false)
     # only allow a certain number of alters to run per cluster in parallel
     # TODO: make this thread safe
-    return false if cluster_running_maxed_out?
+    return false, true if cluster_running_maxed_out?
 
     # once a migration has been started, it can never be edited
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:startable], :lock_version => lock_version).
       update_all(:started_at => DateTime.now, :editable => false, :status => STATUS_GROUPS[:copy_in_progress],
                  :staged => true, :auto_run => auto_run)
-    updated == 1
+    return updated == 1, false
   end
 
   def enqueue!(lock_version)

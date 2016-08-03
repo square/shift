@@ -186,7 +186,7 @@ class MigrationsController < ApplicationController
     @migration = Migration.find(params[:id])
     authorize @migration, :run_action?
 
-    if @migration.start!(params[:lock_version])
+    if @migration.start!(params[:lock_version])[0]
       @migration.reload
       send_notifications
     end
