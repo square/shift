@@ -23,14 +23,13 @@ class MysqlHelper
     raise MysqlError, 'host not found' if @host.nil?
 
     begin
-      @client =
-        Mysql2::Client.new(
-          Rails.application.config.x.mysql_helper.db_config.merge({
+      config = Rails.application.config.x.mysql_helper.db_config.merge({
           :host => @host,
           :connect_timeout => 5})
-        )
+      @client = Mysql2::Client.new(config)
     rescue Mysql2::Error => e
-      raise MysqlError, "error in connection: #{e}"
+      config[:password] = "*****" if config[:password]
+      raise MysqlError, "Problem establishing mysql connection (error: #{e}) (connection info: #{config})"
     end
   end
 
@@ -63,7 +62,8 @@ class MysqlHelper
   def self.safe_databases(cluster_name)
     begin
       MysqlHelper.new(cluster_name).databases
-    rescue
+    rescue => e
+      Rails.logger.warn e
       []
     end
   end
