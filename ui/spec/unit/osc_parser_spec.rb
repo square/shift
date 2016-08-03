@@ -225,12 +225,6 @@ class OSCParseTester
       expect(@result[:run]).to eq(:long)
     end
 
-    it 'tests for bad key_block_size' do
-      expect{
-        @evaluator.parse_int('ALTER TABLE bogus ENGINE=InnoDB ROW_FORMAT=COMPRESSED, KEY_BLOCK_SIZE=5, CHECKSUM=1, DROP FOREIGN KEY fk1')
-      }.to raise_error ShiftError
-    end
-
     it 'tests alter union' do
       @result = @evaluator.parse_int('alter table abc MAX_ROWS = 1, UNION = (a, b, c), MIN_ROWS=0')
       expect(@result[:stm]).to eq('alter table abc MAX_ROWS = 1 , UNION = ( a , b , c ) , MIN_ROWS = 0')
@@ -245,12 +239,6 @@ class OSCParseTester
       expect{
         @evaluator.parse_int('alter table select add column abc DATE')
       }.to raise_error(ParseError)
-    end
-
-    it 'tests for bad engines' do
-      expect{
-        @evaluator.parse_int('alter table abc engine myisam')
-      }.to raise_error(ShiftError)
     end
 
     it 'tests from w3schools' do
@@ -305,114 +293,11 @@ REMOVE PARTITIONING')
       }.to raise_error(ParseError)
     end
 
-    it 'tests for alter table with compressed / key_block_size' do
-      @result = @evaluator.parse_int("ALTER TABLE ledger_entries ENGINE=Innodb \
-ROW_FORMAT=Compressed KEY_BLOCK_SIZE=8")
-      expect(@result[:stm]).to eq("ALTER TABLE ledger_entries ENGINE = Innodb \
-ROW_FORMAT = Compressed KEY_BLOCK_SIZE = 8")
-      expect(@result[:run]).to eq(:long)
-    end
+    it 'tests for create table' do
+      @result = @evaluator.parse_int("CREATE TABLE Persons (PersonID int)")
 
-    it 'tests for create table with engine' do
-      @result = @evaluator.parse_int("CREATE TABLE Persons (PersonID int)
-ENGINE = InnoDB")
-
-      expect(@result[:stm]).to eq("CREATE TABLE Persons ( PersonID int ) \
-ENGINE = InnoDB ROW_FORMAT = DYNAMIC")
+      expect(@result[:stm]).to eq("CREATE TABLE Persons ( PersonID int )")
       expect(@result[:run]).to eq(:short)
-    end
-
-    it 'tests for create table with row format' do
-      @result = @evaluator.parse_int("CREATE TABLE Persons (PersonID int)
-ROW_FORMAT = COMPRESSED")
-
-      expect(@result[:stm]).to eq("CREATE TABLE Persons ( PersonID int ) \
-ROW_FORMAT = COMPRESSED ENGINE = InnoDB")
-      expect(@result[:run]).to eq(:short)
-    end
-
-    it 'tests for create table with engine and row format' do
-      @result = @evaluator.parse_int("CREATE TABLE Persons (PersonID int)
-ENGINE = InnoDB ROW_FORMAT = COMPRESSED")
-
-      expect(@result[:stm]).to eq("CREATE TABLE Persons ( PersonID int ) \
-ENGINE = InnoDB ROW_FORMAT = COMPRESSED")
-      expect(@result[:run]).to eq(:short)
-    end
-
-    it 'tests for alter with row_format setting 1' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'FIXED'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc DROP COLUMN def')
-      expect(@result[:stm]).to eq('ALTER TABLE abc DROP COLUMN def , ROW_FORMAT = DYNAMIC')
-      expect(@result[:run]).to eq(:long)
-    end
-
-    it 'tests for alter with row_format setting 2' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'COMPRESSED'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:stm]).to eq('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:run]).to eq(:maybeshort)
-    end
-
-    it 'tests for alter with row_format setting 3' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'DYNAMIC'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:stm]).to eq('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:run]).to eq(:maybeshort)
-    end
-
-    it 'tests for alter with row_format setting 4' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'DYNAMIC'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc ROW_FORMAT = COMPRESSED, ' +
-                                 'DROP INDEX def, KEY_BLOCK_SIZE = 4')
-      expect(@result[:stm]).to eq('ALTER TABLE abc ROW_FORMAT = COMPRESSED , DROP INDEX def , KEY_BLOCK_SIZE = 4')
-      expect(@result[:run]).to eq(:long)
-    end
-
-    it 'tests for alter with row_format setting 5' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'FIXED'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc ROW_FORMAT = COMPRESSED, ' +
-                                 'DROP INDEX def, KEY_BLOCK_SIZE = 4')
-      expect(@result[:stm]).to eq('ALTER TABLE abc ROW_FORMAT = COMPRESSED , DROP INDEX def , KEY_BLOCK_SIZE = 4')
-      expect(@result[:run]).to eq(:long)
-    end
-
-    # when an alter is maybeshort, don't append ROW_FORMAT
-    it 'tests for alter with row_format setting 6' do
-      checkers = {
-        get_row_format: lambda do |_|
-          'FIXED'
-        end
-      }
-      @evaluator.merge_checkers!(checkers)
-      @result = @evaluator.parse_int('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:stm]).to eq('ALTER TABLE abc DROP INDEX def')
-      expect(@result[:run]).to eq(:maybeshort)
     end
 
     it 'tests that order not supported' do
@@ -444,8 +329,7 @@ City varchar(255)
 
       expect(@result[:stm]).to eq("CREATE TABLE Persons ( PersonID int , \
 LastName varchar ( 255 ) , FirstName varchar ( 255 ) , \
-Address varchar ( 255 ) , City varchar ( 255 ) ) ENGINE = InnoDB \
-ROW_FORMAT = DYNAMIC")
+Address varchar ( 255 ) , City varchar ( 255 ) )")
       expect(@result[:run]).to eq(:short)
     end
 

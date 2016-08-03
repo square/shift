@@ -35,24 +35,6 @@ def require_default_when_not_null(tree)
   end
 end
 
-def check_row_format(state, checker, name, st)
-  if st.subname != :single && checker
-    prev_row_format = checker.call name
-
-    suffix =
-      if (!state[:row_format] &&
-          !['DYNAMIC', 'COMPRESSED'].include?(prev_row_format))
-      then
-        long_run(state)
-        "#{st.subname == :list ? ', ' : ''}ROW_FORMAT = DYNAMIC "
-      else
-        ''
-      end
-
-    st.val << AST.new(:new, nil, [suffix])
-  end
-end
-
 def check_enum_and_column_rename(state, checker, tree, name)
   # after long_run, we can quit the function, but after short_run,
   # we have to continue checking
@@ -168,13 +150,6 @@ class OscParser
 
         check_enum_and_column_rename(state, @checkers[:get_columns], tree, name)
 
-        # if it can be a short run, don't worry about row_format b/c
-        # that might rule out a short run possibility
-        if !state[:run][:short]
-          check_row_format state, @checkers[:get_row_format], name,
-                           tree.find_top(name: :r_opt_alter_commands)
-        end
-
         need_resolution(state)
       end,
 
@@ -214,66 +189,12 @@ class OscParser
       # ======== body =======
       # =====================
 
-      r_shared_table_option__ENGINE: lambda do |tree, state|
-        state[:with_engine] = true;
-      end,
-
       r_opt_alter_commands__empty: lambda do |tree, state|
         short_run(state);
       end,
 
-      r_opt_alter_commands__list: lambda do |tree, state|
-        if state[:row_format] == :compressed &&
-           state[:key_block_size] != '4' &&
-           state[:key_block_size] != '8'
-        then
-          raise ShiftError, 'When ROW_FORMAT = COMPRESSED, ' +
-                                'KEY_BLOCK_SIZE must be set to either 4 or 8'
-        end
-      end,
-
       r_opt_alter_commands__single: lambda do |tree, state|
         long_run(state)
-      end,
-
-      r_ROW_FORMAT_option__DEFAULT: lambda do |tree, state|
-        raise ShiftError, 'only ROW_FORMAT = DYNAMIC / COMPRESSED supported'
-      end,
-
-      r_ROW_FORMAT_option__FIXED: lambda do |tree, state|
-        raise ShiftError, 'only ROW_FORMAT = DYNAMIC / COMPRESSED supported'
-      end,
-
-      r_ROW_FORMAT_option__REDUNDANT: lambda do |tree, state|
-        raise ShiftError, 'only ROW_FORMAT = DYNAMIC / COMPRESSED supported'
-      end,
-
-      r_ROW_FORMAT_option__COMPACT: lambda do |tree, state|
-        raise ShiftError, 'only ROW_FORMAT = DYNAMIC / COMPRESSED supported'
-      end,
-
-      r_ROW_FORMAT_option__DYNAMIC: lambda do |tree, state|
-        state[:row_format] = :dynamic
-      end,
-
-      r_ROW_FORMAT_option__COMPRESSED: lambda do |tree, state|
-        state[:row_format] = :compressed
-      end,
-
-      r_opt_CREATE_TABLE_options__empty: lambda do |tree, state|
-        tree.val = ['ENGINE = InnoDB ROW_FORMAT = DYNAMIC ']
-      end,
-
-      r_opt_CREATE_TABLE_options__body: lambda do |tree, state|
-        tree.val << AST.new(
-          :new, nil, [state[:with_engine] ? '' : 'ENGINE = InnoDB '])
-        tree.val << AST.new(
-          :new, nil, [state[:row_format] ? '' : 'ROW_FORMAT = DYNAMIC '])
-      end,
-
-      r_ENGINE_name__other: lambda do |tree, state|
-        raise ShiftError, "engine #{tree} not supported. " +
-                              'Only InnoDB can be used.'
       end,
 
       r_charset_name: lambda do |tree, state|
@@ -400,10 +321,6 @@ class OscParser
 
       r_shared_table_option__CONNECTION: lambda do |tree, state|
         raise ShiftError, 'connection not supported'
-      end,
-
-      r_shared_table_option__KEY_BLOCK_SIZE: lambda do |tree, state|
-        state[:key_block_size] = tree.find_top(name: :nat).to_s.strip
       end,
 
       r_opt_partition_values__LESS_THAN_values: lambda do |tree, state|

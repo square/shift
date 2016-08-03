@@ -24,9 +24,6 @@ module Form
         table_exists: lambda do |mode, table|
           mysql.table_exists? mode, record.database, table
         end,
-        get_row_format: lambda do |table|
-          mysql.row_format(record.database, table).upcase
-        end,
         get_columns: lambda do |table|
           mysql.columns record.database, table
         end,
