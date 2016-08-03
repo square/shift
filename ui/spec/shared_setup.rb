@@ -25,8 +25,6 @@ RSpec.shared_context "shared setup", :a => :b do
         true
       elsif mode == :table && this.cluster == 'appname-001' && database == 'testdb' && table == 'non_existing_table'
         true
-      elsif mode == :table && this.cluster == 'appname-001' && database == 'testdb' && table == 'row_format_compact'
-        true
       elsif mode == :table && this.cluster == 'appname-001' && database == 'testdb' && table == 'has_foreign_keys'
         true
       else
@@ -38,13 +36,6 @@ RSpec.shared_context "shared setup", :a => :b do
         ['testdb']
       else
         []
-      end
-    end
-    allow_any_instance_of(StubMysql).to receive(:row_format) do |this, database, table|
-      if table == 'row_format_compact'
-        'COMPACT'
-      else
-        'DYNAMIC'
       end
     end
     allow_any_instance_of(StubMysql).to receive(:foreign_keys) do |this, database, table|

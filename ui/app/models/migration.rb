@@ -90,9 +90,6 @@ class Migration < ActiveRecord::Base
       table_exists: lambda do |mode, table|
         mysql.table_exists? mode, self.database, table
       end,
-      get_row_format: lambda do |table|
-        mysql.row_format(self.database, table).upcase
-      end,
       get_columns: lambda do |table|
         mysql.columns self.database, table
       end,

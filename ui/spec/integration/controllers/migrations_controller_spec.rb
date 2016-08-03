@@ -320,18 +320,6 @@ RSpec.describe MigrationsController, type: :controller do
         expect(@migration.parsed[:table]).to eq('existing_table')
       end
 
-      it 'updates and alters DDL' do
-        patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {ddl_statement: 'ALTER TABLE row_format_compact DROP COLUMN asd'}
-        @migration.reload
-        expect(@migration.parsed[:stm]).to eq('ALTER TABLE row_format_compact DROP COLUMN asd , ROW_FORMAT = DYNAMIC')
-      end
-
-      it 'does not alter DDL if maybeshort' do
-        patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {ddl_statement: 'ALTER TABLE row_format_compact DROP INDEX asd'}
-        @migration.reload
-        expect(@migration.parsed[:stm]).to eq('ALTER TABLE row_format_compact DROP INDEX asd')
-      end
-
       it 'could drop all foreign keys' do
         patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {
           ddl_statement: 'ALTER TABLE has_foreign_keys DROP FOREIGN KEY fk2, DROP FOREIGN KEY `fk1`'

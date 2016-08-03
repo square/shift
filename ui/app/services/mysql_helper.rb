@@ -68,19 +68,6 @@ class MysqlHelper
     end
   end
 
-  def row_format(database, table)
-    database = normalize_database(database)
-    table = normalize_table(table)
-    rows = @client.query("SELECT ROW_FORMAT FROM information_schema.tables
-                          WHERE table_schema='#{database}'
-                          AND table_name='#{table}' LIMIT 1")
-    if rows.count != 0
-      rows.first['ROW_FORMAT']
-    else
-      raise MysqlError, "table #{table} not exists!"
-    end
-  end
-
   def columns(database, table)
     database = normalize_database(database)
     table = normalize_table(table)
