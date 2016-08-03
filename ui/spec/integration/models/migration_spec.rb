@@ -144,7 +144,7 @@ RSpec.describe Migration do
       it 'sets the start time of the migration' do
         migration = FactoryGirl.create(:start_migration)
         expect(migration.started_at).to eq(nil)
-        expect(migration.start!(migration.lock_version)).to eq(true)
+        expect(migration.start!(migration.lock_version)).to eq([true, false])
         migration.reload
         expect(migration.started_at.utc.to_i).to be_within(2).of Time.now.to_i
       end
@@ -152,7 +152,7 @@ RSpec.describe Migration do
       it 'sets the migration as uneditable' do
         migration = FactoryGirl.create(:start_migration)
         expect(migration.editable).to eq(true)
-        expect(migration.start!(migration.lock_version)).to eq(true)
+        expect(migration.start!(migration.lock_version)).to eq([true, false])
         migration.reload
         expect(migration.editable).to eq(false)
       end
@@ -160,7 +160,7 @@ RSpec.describe Migration do
       it 'stages the migration and puts it in the copy step' do
         migration = FactoryGirl.create(:start_migration)
         expect(migration.staged).to eq(false)
-        expect(migration.start!(migration.lock_version)).to eq(true)
+        expect(migration.start!(migration.lock_version)).to eq([true, false])
         migration.reload
         expect(migration.staged).to eq(true)
         expect(migration.status).to eq(Migration.status_groups[:copy_in_progress])
@@ -171,7 +171,7 @@ RSpec.describe Migration do
       it 'sets the auto_run field on the migration to true or false (true here)' do
         migration = FactoryGirl.create(:start_migration)
         expect(migration.auto_run).to eq(false)
-        expect(migration.start!(migration.lock_version, true)).to eq(true)
+        expect(migration.start!(migration.lock_version, true)).to eq([true, false])
         migration.reload
         expect(migration.auto_run).to eq(true)
       end
@@ -182,7 +182,7 @@ RSpec.describe Migration do
         migration = FactoryGirl.create(:start_migration)
         FactoryGirl.create(:running_migration)
         expect(migration.started_at).to eq(nil)
-        expect(migration.start!(migration.lock_version)).to eq(false)
+        expect(migration.start!(migration.lock_version)).to eq([false, true])
         migration.reload
         expect(migration.started_at).to eq(nil)
       end
@@ -194,7 +194,7 @@ RSpec.describe Migration do
         migration.ddl_statement = "create table t like z"
         FactoryGirl.create(:running_migration)
         expect(migration.started_at).to eq(nil)
-        expect(migration.start!(migration.lock_version)).to eq(true)
+        expect(migration.start!(migration.lock_version)).to eq([true, false])
         migration.reload
         expect(migration.started_at.utc.to_i).to be_within(2).of Time.now.to_i
       end
@@ -203,7 +203,7 @@ RSpec.describe Migration do
     context 'is not on start step' do
       it 'does not set the start time of the migration' do
         migration = FactoryGirl.create(:approval_migration)
-        expect(migration.start!(migration.lock_version)).to eq(false)
+        expect(migration.start!(migration.lock_version)).to eq([false, false])
         migration.reload
         expect(migration.started_at).to eq(nil)
       end

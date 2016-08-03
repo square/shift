@@ -267,10 +267,14 @@ module Api
           return render json: {:status => 404, :errors => ["Migration not found."]}, :status => 404
         end
 
+        # is the cluster already maxed out on running migrations? only relevant
+        # for starting a migration
+        maxed_out = false
         # make sure we don't allow approving a run type that shouldn't be allowed
         action_step = step == "approve" ? "#{step}_#{params[:runtype]}" : step
         if available_actions.map{|a| a.to_s == action_step }.any?
-          if @migration.send("#{step.split('_')[0]}!", *extra_params)
+          succeeded, maxed_out = @migration.send("#{step.split('_')[0]}!", *extra_params)
+          if succeeded
             @migration.reload
             step_past_tense = case step
             when "start" || "cancel"
@@ -283,14 +287,16 @@ module Api
           end
         end
 
-        render json: {:status => 400, :errors => generic_error_msg(step)}, :status => 400
+        render json: {:status => 400, :errors => generic_error_msg(step, maxed_out)}, :status => 400
       end
 
-      def generic_error_msg(step)
+      def generic_error_msg(step, maxed_out = false)
         errors = []
         action_step = step == "approve" ? "#{step}_#{params[:runtype]}" : step
         errors << "Invalid action." unless available_actions.map{|a| a.to_s == action_step }.any?
         errors << "Incorrect lock_version supplied." unless params[:lock_version].to_i == @migration.lock_version
+        errors << "Can't start migration because you are already running the maximum # of migrations "\
+          "per cluster (#{Migration.parallel_run_limit})." if (step == "start" && maxed_out)
         return errors
       end
 
