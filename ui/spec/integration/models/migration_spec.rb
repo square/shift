@@ -121,10 +121,12 @@ RSpec.describe Migration do
         expect(migration.approved_by).not_to eq(nil)
         expect(migration.approved_at).not_to eq (nil)
         expect(migration.unapprove!(migration.lock_version)).to eq(true)
+        starting_lock_version = migration.lock_version
         migration.reload
         expect(migration.approved_by).to eq(nil)
         expect(migration.approved_at).to eq (nil)
         expect(migration.status).to eq(Migration.status_groups[:awaiting_approval])
+        expect(migration.lock_version).to eq(starting_lock_version + 1)
       end
     end
 
