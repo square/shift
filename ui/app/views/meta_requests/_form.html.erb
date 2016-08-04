@@ -50,7 +50,12 @@
     <% end %>
 
     <div class="form-group">
-      <label for="ddl_statement" class="col-md-3 control-label">DDL statement</label>
+      <div class="col-md-3 control-label">
+        <label for="ddl_statement">DDL statement</label>
+        <div class="dalontism-ddl">
+          <span class="dalontism-symbol glyphicon glyphicon-ok" aria-hidden="true"></span>
+        </div>
+      </div>
       <div class="col-md-7">
         <textarea id="ddl_statement" class="form-control" name="ddl_statement" rows="3"><%= @saved_state[:ddl_statement] %></textarea>
         <span class="help-block">This is what online-schema-change will actually run.
