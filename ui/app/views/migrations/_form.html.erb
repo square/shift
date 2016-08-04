@@ -72,7 +72,12 @@
     </div>
 
     <div class="form-group">
-      <%= f.label :ddl_statement, 'DDL statement', class: 'col-md-3 control-label', rows: 2 %>
+      <div class="col-md-3 control-label">
+        <%= f.label :ddl_statement, 'DDL statement', rows: 2 %>
+        <div class="dalontism-ddl">
+          <span class="dalontism-symbol glyphicon glyphicon-ok" aria-hidden="true"></span>
+        </div>
+      </div>
       <div class="col-md-7">
         <%= f.text_area :ddl_statement, class: 'form-control' %>
         <span class="help-block">This is what online-schema-change will actually run.

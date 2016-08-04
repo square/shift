@@ -32,14 +32,20 @@ function validateDdl(id) {
         data: { msg: ddl },
         success: function(result) {
             var box = $('[id$=' + id +']').parent();
+            var symbol = $('[id$=' + id +']').parent().prev().find(".dalontism-symbol");
             if (ddl === "") {
                 box.removeClass('has-success has-error');
+                symbol.removeClass('glyphicon-ok glyphicon-remove error-red success-green');
             } else if (result.error === null) {
                 box.removeClass('has-error');
+                symbol.removeClass('glyphicon-remove error-red');
                 box.addClass('has-success');
+                symbol.addClass('glyphicon-ok success-green');
             } else {
                 box.removeClass('has-success');
+                symbol.removeClass('glyphicon-ok success-green');
                 box.addClass('has-error');
+                symbol.addClass('glyphicon-remove error-red');
             }
         },
         error: function(data) {

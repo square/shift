@@ -64,6 +64,18 @@ footer .text-muted {
   background-color: #6f5499;
 }
 
+.error-red {
+  color: #a94442;
+}
+
+.success-green {
+  color: #3c763d;
+}
+
+.dalontism-ddl {
+  padding-top: 22px;
+}
+
 #error_message {
   text-align: center;
   margin-top: 150px;
