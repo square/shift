@@ -208,14 +208,16 @@ class Migration < ActiveRecord::Base
   # started, second element is a bool of whether or not the cluster was maxed out
   def start!(lock_version, auto_run = false)
     # only allow a certain number of alters to run per cluster in parallel
-    # TODO: make this thread safe
-    return false, true if cluster_running_maxed_out?
+    ActiveRecord::Base.transaction do
+      Migration.lock.where(:cluster_name => self.cluster_name)
+      return false, true if cluster_running_maxed_out?
 
-    # once a migration has been started, it can never be edited
-    updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:startable], :lock_version => lock_version).
-      update_all(:started_at => DateTime.now, :editable => false, :status => STATUS_GROUPS[:copy_in_progress],
-                 :staged => true, :auto_run => auto_run)
-    return updated == 1, false
+      # once a migration has been started, it can never be edited
+      updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:startable], :lock_version => lock_version).
+        update_all(:started_at => DateTime.now, :editable => false, :status => STATUS_GROUPS[:copy_in_progress],
+                   :staged => true, :auto_run => auto_run)
+      return updated == 1, false
+    end
   end
 
   def enqueue!(lock_version)
@@ -295,24 +297,27 @@ class Migration < ActiveRecord::Base
   end
 
   def unstage!
-    if self.staged?
-      self.staged = false
-      return self.save
+    self.with_lock do
+      if self.staged?
+        self.staged = false
+        return self.save!
+      end
+      return false
     end
-    false
   end
 
   def increment_status!
     Migration.increment_counter(:status, self)
-    self.save
   end
 
   def next_step_machine!
-    if (STATUS_GROUPS[:machine].include? self.status) && (!self.staged?)
-      # bump the status to the next step
-      return self.increment_status!
+    self.with_lock do
+      if (STATUS_GROUPS[:machine].include? self.status) && (!self.staged?)
+        # bump the status to the next step
+        return self.increment_status!
+      end
+      return false
     end
-    false
   end
 
   def app

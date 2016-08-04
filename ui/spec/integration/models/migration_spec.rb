@@ -516,9 +516,8 @@ RSpec.describe Migration do
         migration.next_step_machine!
       end
 
-      it 'does not increment the status of the migration because it is taged' do
-        migration = FactoryGirl.create(:machine_migration)
-        migration.staged = true
+      it 'does not increment the status of the migration because it is staged' do
+        migration = FactoryGirl.create(:machine_migration, :staged => true)
         expect(migration).to_not receive(:increment_status!)
         migration.next_step_machine!
       end
