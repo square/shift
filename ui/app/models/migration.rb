@@ -192,15 +192,15 @@ class Migration < ActiveRecord::Base
     end
 
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_approval], :lock_version => lock_version).
-      update_all(:runtype => runtype, :approved_by => current_user_name,
-                 :approved_at =>  DateTime.now, :status => STATUS_GROUPS[:awaiting_start])
+      update_all(["runtype = ?, approved_by = ?, approved_at = NOW(), status = #{STATUS_GROUPS[:awaiting_start]}, " \
+      "lock_version = lock_version + 1", runtype, current_user_name])
     updated == 1
   end
 
   def unapprove!(lock_version)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_start], :lock_version => lock_version).
-      update_all(:runtype => TYPES[:run][:undecided], :approved_by => nil,
-                 :approved_at =>  nil, :status => STATUS_GROUPS[:awaiting_approval])
+      update_all("runtype = #{TYPES[:run][:undecided]}, approved_by = NULL, approved_at = NULL, " \
+                  "status = #{STATUS_GROUPS[:awaiting_approval]}, lock_version = lock_version + 1")
     updated == 1
   end
 
@@ -214,40 +214,40 @@ class Migration < ActiveRecord::Base
 
       # once a migration has been started, it can never be edited
       updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:startable], :lock_version => lock_version).
-        update_all(:started_at => DateTime.now, :editable => false, :status => STATUS_GROUPS[:copy_in_progress],
-                   :staged => true, :auto_run => auto_run)
+        update_all(["started_at = NOW(), editable = 0, status = #{STATUS_GROUPS[:copy_in_progress]}, " \
+        "staged = 1, auto_run = ?, lock_version = lock_version + 1", auto_run])
       return updated == 1, false
     end
   end
 
   def enqueue!(lock_version)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_start], :lock_version => lock_version).
-      update_all(:status => STATUS_GROUPS[:enqueued], :auto_run => true)
+      update_all("status = #{STATUS_GROUPS[:enqueued]}, auto_run = 1, lock_version = lock_version + 1")
     updated == 1
   end
 
   def dequeue!(lock_version)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:enqueued], :lock_version => lock_version).
-      update_all(:status => STATUS_GROUPS[:awaiting_start], :auto_run => false)
+      update_all("status = #{STATUS_GROUPS[:awaiting_start]}, auto_run = 0, lock_version = lock_version + 1")
     updated == 1
   end
 
   def pause!
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:copy_in_progress]).
-      update_all(:status => STATUS_GROUPS[:pausing], :staged => true, :auto_run => false)
+      update_all("status = #{STATUS_GROUPS[:pausing]}, staged = 1, auto_run = 0, lock_version = lock_version + 1")
     updated == 1
   end
 
   def rename!(lock_version)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:awaiting_rename], :lock_version => lock_version).
-      update_all(:status => STATUS_GROUPS[:rename_in_progress], :staged => true)
+      update_all("status = #{STATUS_GROUPS[:rename_in_progress]}, staged = 1, lock_version = lock_version + 1")
     updated == 1
   end
 
   def resume!(lock_version, auto_run = false)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:resumable], :lock_version => lock_version).
-      update_all(:status => STATUS_GROUPS[:copy_in_progress], :staged => true, :error_message => nil,
-                 :auto_run => auto_run)
+      update_all(["status = #{STATUS_GROUPS[:copy_in_progress]}, staged = 1, error_message = NULL, auto_run = ?, " \
+      "lock_version = lock_version + 1", auto_run])
     updated == 1
   end
 
@@ -256,25 +256,27 @@ class Migration < ActiveRecord::Base
     # when a migration is canceled, regardless of the step it's on, we stage
     # it. once the runner unstages it, we don't hear from this migration again
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:cancelable]).
-      update_all(:status => STATUS_GROUPS[:canceled], :staged => true)
+      update_all("status = #{STATUS_GROUPS[:canceled]}, staged = 1, lock_version = lock_version + 1")
     updated == 1
   end
 
   def complete!
     updated = Migration.where(:id => self.id).
-      update_all(:status => STATUS_GROUPS[:completed], :completed_at => DateTime.now)
+      update_all("status = #{STATUS_GROUPS[:completed]}, completed_at = NOW(), lock_version = lock_version + 1")
     updated == 1
   end
 
   def fail!(error_message)
     updated = Migration.where(:id => self.id).
-      update_all(:status => STATUS_GROUPS[:failed], :error_message => error_message, :auto_run => false)
+      update_all(["status = #{STATUS_GROUPS[:failed]}, error_message = ?, auto_run = 0, " \
+      "lock_version = lock_version + 1", error_message])
     updated == 1
   end
 
   def error!(error_message)
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:copy_in_progress]).
-      update_all(:status => STATUS_GROUPS[:error], :error_message => error_message, :auto_run => false)
+      update_all(["status = #{STATUS_GROUPS[:error]}, error_message = ?, auto_run = 0, " \
+      "lock_version = lock_version + 1", error_message])
     updated == 1
   end
 
@@ -286,13 +288,13 @@ class Migration < ActiveRecord::Base
 
   def offer!
     updated = Migration.where(:id => self.id, :status => STATUS_GROUPS[:copy_in_progress]).
-      update_all(:status => STATUS_GROUPS[:copy_in_progress], :staged => true)
+      update_all("status = #{STATUS_GROUPS[:copy_in_progress]}, staged = 1, lock_version = lock_version + 1")
     updated == 1
   end
 
   def unpin_run_host!
     updated = Migration.where(:id => self.id).
-      update_all(:run_host => nil)
+      update_all("run_host = NULL, lock_version = lock_version + 1")
     updated == 1
   end
 

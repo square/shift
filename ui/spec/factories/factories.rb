@@ -30,6 +30,7 @@ FactoryGirl.define do
     requestor "developer"
     max_threads_running "200"
     max_replication_lag "1"
+    lock_version = 4
   end
 
   factory :meta_request do
