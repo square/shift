@@ -372,8 +372,11 @@ class OscParser
     end
 
     if @checkers[:get_foreign_keys]
-      unless (@checkers[:get_foreign_keys].call(table) - state[:dropped_foreign_keys]).empty?
-        raise ShiftError, 'table has foreign keys which are not all being dropped'
+      # don't care if a table has foreign keys if we're dropping it
+      unless state[:action] == :drop
+        unless (@checkers[:get_foreign_keys].call(table) - state[:dropped_foreign_keys]).empty?
+          raise ShiftError, 'table has foreign keys which are not all being dropped'
+        end
       end
     end
   end

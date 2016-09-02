@@ -27,6 +27,8 @@ RSpec.shared_context "shared setup", :a => :b do
         true
       elsif mode == :table && this.cluster == 'appname-001' && database == 'testdb' && table == 'has_foreign_keys'
         true
+      elsif mode == :table && this.cluster == 'appname-001' && database == 'testdb' && table == 'has_foreign_keys_referenced'
+        true
       else
         false
       end

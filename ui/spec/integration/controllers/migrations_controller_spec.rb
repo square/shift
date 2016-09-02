@@ -328,6 +328,14 @@ RSpec.describe MigrationsController, type: :controller do
         expect(@migration.parsed[:stm]).to eq('ALTER TABLE has_foreign_keys DROP FOREIGN KEY _fk2 , DROP FOREIGN KEY `_fk1`')
       end
 
+      it 'can drop table which has foreign keys' do
+        patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {
+          ddl_statement: 'DROP TABLE has_foreign_keys'
+        }
+        @migration.reload
+        expect(@migration.parsed[:table]).to eq('has_foreign_keys')
+      end
+
       it 'redirects to the migration' do
         patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {ddl_statement: 'DROP TABLE existing_table'}
         expect(response).to redirect_to(Migration.last)
@@ -363,9 +371,9 @@ RSpec.describe MigrationsController, type: :controller do
         expect(@migration.parsed[:table]).to eq('test_table')
       end
 
-      it 'could not drop table which has foreign keys' do
+      it 'could not drop table which is referenced by foreign keys' do
         patch :update, id: @migration, lock_version: @migration.lock_version, form_edit_migration_request: {
-          ddl_statement: 'DROP TABLE has_foreign_keys'
+          ddl_statement: 'DROP TABLE has_foreign_keys_referenced'
         }
         @migration.reload
         expect(@migration.parsed[:table]).to eq('test_table')
