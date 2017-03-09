@@ -11,7 +11,8 @@ end
 class MysqlHelper
   def initialize(cluster_name)
     @cluster = Cluster.find_by(:name => cluster_name)
-	@host = @cluster.rw_host
+    @host = @cluster.rw_host
+    @port = @cluster.port
 
     # obsolete cluster
 
@@ -20,6 +21,7 @@ class MysqlHelper
     begin
       config = Rails.application.config.x.mysql_helper.db_config.merge({
           :host => @host,
+          :port => @port,
           :connect_timeout => 5})
       @client = Mysql2::Client.new(config)
     rescue Mysql2::Error => e
