@@ -3,7 +3,6 @@ package migration
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -73,20 +72,6 @@ var (
 	DropTriggers             = (*Migration).DropTriggers
 	CleanUp                  = (*Migration).CleanUp
 	TimestampedTable         = timestampedTable
-
-	// define errors
-	ErrDbConnect   = errors.New("migration: failed to connect to the database")
-	ErrQueryFailed = errors.New("migration: query failed")
-	ErrStateFile   = errors.New("migration: problem reading statefile")
-	ErrTableStats  = errors.New("migration: collecting table stats query didn't return as expected. This is likely due to either " +
-		"the database name or table name being incorrect.")
-	ErrInvalidInsert    = errors.New("migration: invalid final insert statement")
-	ErrDryRunCreatesNew = errors.New("migration: a dry run for creating the table/view didn't run as expected. This is likely due " +
-		"to the table/view already existing.")
-	ErrDirectDrop            = errors.New("migration: could not figure out how to drop the table/view directly.")
-	ErrPtOscStdout           = errors.New("migration: failed to get stdout of pt-online-schema-change")
-	ErrPtOscStderr           = errors.New("migration: failed to get stderr of pt-online-schema-change")
-	ErrPtOscUnexpectedStderr = errors.New("migration: pt-online-schema-change stderr not as expected")
 )
 
 type Migration struct {
@@ -204,14 +189,14 @@ func (migration *Migration) ValidateFinalInsert() error {
 	validInsertRegex := regexp.MustCompile("^(?i)(INSERT\\s+INTO\\s+)[^;]+$")
 	validInsertSyntax := validInsertRegex.MatchString(finalInsert)
 	if !validInsertSyntax {
-		return ErrInvalidInsert
+		return NewErrInvalidInsert(fmt.Errorf("is not a valid insert statement"))
 	}
 
 	glog.Infof("mig_id=%d: Validating final insert '%s' in a transaction and rolling it back.", migration.Id, finalInsert)
 	err := migration.DbClient.ValidateInsertStatement(finalInsert)
 	if err != nil {
 		glog.Errorf("mig_id=%d: Final insert '%s' failed (error: %s).", migration.Id, finalInsert, err)
-		return ErrInvalidInsert
+		return NewErrInvalidInsert(err)
 	}
 	glog.Infof("mig_id=%d: Final insert '%s' was successfully validated and rolled back.", migration.Id, finalInsert)
 
@@ -355,7 +340,7 @@ func (migration *Migration) RunReadQuery(query string, args ...interface{}) (map
 	response, err := migration.DbClient.QueryReturnColumnDict(query, args...)
 	if err != nil {
 		glog.Errorf("mig_id=%d: Query '%s' failed (error: %s).", migration.Id, query, err)
-		return nil, ErrQueryFailed
+		return nil, NewErrQueryFailed(query, err)
 	}
 	glog.Infof("mig_id=%d: Query response was '%v'", migration.Id, response)
 	return response, nil
@@ -371,7 +356,7 @@ func (migration *Migration) RunWriteQuery(query string, args ...interface{}) err
 	err := migration.DbClient.QueryInsertUpdate(query, args...)
 	if err != nil {
 		glog.Errorf("mig_id=%d: Query '%s' failed (error: %s).", migration.Id, query, err)
-		return ErrQueryFailed
+		return NewErrQueryFailed(query, err)
 	}
 	return nil
 }

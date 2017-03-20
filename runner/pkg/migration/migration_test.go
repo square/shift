@@ -133,9 +133,9 @@ var validateFinalInsertTests = []struct {
 	expectedError error
 }{
 	// invalid final insert
-	{invalidInsert, 0, ErrInvalidInsert},
+	{invalidInsert, 0, ErrInvalidInsert{}},
 	// final insert fails
-	{validInsert, 1, ErrInvalidInsert},
+	{validInsert, 1, ErrInvalidInsert{}},
 	// valid final insert
 	{validInsert, 0, nil},
 }
@@ -148,8 +148,15 @@ func TestValidateFinalInsert(t *testing.T) {
 
 		expectedError := tt.expectedError
 		actualError := migration.ValidateFinalInsert()
-		if actualError != expectedError {
-			t.Errorf("error = %v, want %v", actualError, expectedError)
+		switch actualError.(type) {
+		default:
+			if actualError != expectedError {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
+		case ErrInvalidInsert:
+			if _, ok := expectedError.(ErrInvalidInsert); !ok {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
 		}
 	}
 }
@@ -194,7 +201,7 @@ var collectTableStatsTests = []struct {
 	expectedError      error
 }{
 	// fail to execute table stats query
-	{1, nil, nil, ErrQueryFailed},
+	{1, nil, nil, ErrQueryFailed{}},
 	// fail to get table stats when not all fields are returned in query
 	{0, map[string][]string{
 		"DATA_LENGTH":  []string{"98"},
@@ -233,8 +240,15 @@ func TestCollectTableStats(t *testing.T) {
 
 		actualTableStats, actualError := migration.CollectTableStats()
 		expectedError := tt.expectedError
-		if actualError != expectedError {
-			t.Errorf("error = %v, want %v", actualError, expectedError)
+		switch actualError.(type) {
+		default:
+			if actualError != expectedError {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
+		case ErrQueryFailed:
+			if _, ok := expectedError.(ErrQueryFailed); !ok {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
 		}
 
 		expectedTableStats := tt.expectedTableStats
@@ -253,11 +267,11 @@ var dryRunCreatesNewTests = []struct {
 	expectedError   error
 }{
 	// fail to run the query to see if the table/view already exists
-	{ErrQueryFailed, nil, nil, nil, ErrQueryFailed},
+	{ErrQueryFailed{}, nil, nil, nil, ErrQueryFailed{}},
 	// table/view already exists
 	{nil, nil, nil, map[string][]string{"count": []string{"1"}}, ErrDryRunCreatesNew},
 	// write query to create the table/view fails
-	{nil, ErrQueryFailed, nil, map[string][]string{"count": []string{"0"}}, ErrQueryFailed},
+	{nil, ErrQueryFailed{}, nil, map[string][]string{"count": []string{"0"}}, ErrQueryFailed{}},
 	// direct drop fails
 	{nil, nil, ErrDirectDrop, map[string][]string{"count": []string{"0"}}, ErrDirectDrop},
 	// succeed
@@ -298,7 +312,7 @@ var directDropTests = []struct {
 	expectedWriteQuery string
 }{
 	// fail on write query
-	{"a", SHORT_RUN, DROP_ACTION, TABLE_MODE, ErrQueryFailed, ErrQueryFailed, "DROP TABLE a"},
+	{"a", SHORT_RUN, DROP_ACTION, TABLE_MODE, ErrQueryFailed{}, ErrQueryFailed{}, "DROP TABLE a"},
 	// succeed drop table
 	{"b", SHORT_RUN, DROP_ACTION, TABLE_MODE, nil, nil, "DROP TABLE b"},
 	// succeed drop view
@@ -324,8 +338,15 @@ func TestDirectDrop(t *testing.T) {
 
 		actualError := migration.DirectDrop()
 		expectedError := tt.expectedError
-		if actualError != expectedError {
-			t.Errorf("error = %v, want %v", actualError, expectedError)
+		switch actualError.(type) {
+		default:
+			if actualError != expectedError {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
+		case ErrQueryFailed:
+			if _, ok := expectedError.(ErrQueryFailed); !ok {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
 		}
 
 		expectedWriteQuery := tt.expectedWriteQuery
@@ -341,7 +362,7 @@ var swapTablesTests = []struct {
 	expectedError   error
 }{
 	// query failed
-	{ErrQueryFailed, ErrQueryFailed},
+	{ErrQueryFailed{}, ErrQueryFailed{}},
 	// success
 	{nil, nil},
 }
@@ -376,7 +397,7 @@ var swapOscTablesTests = []struct {
 	// error getting mig table
 	{"table", "", "", ErrStateFile, nil, []string{"", "", "", ""}, ErrStateFile},
 	// error swapping tables
-	{"table", "_table_new", "", nil, ErrQueryFailed, []string{"table", "", "_table_new", "table"}, ErrQueryFailed},
+	{"table", "_table_new", "", nil, ErrQueryFailed{}, []string{"table", "", "_table_new", "table"}, ErrQueryFailed{}},
 	// successfully swap tables
 	{"table", "_table_new", "_table_old", nil, nil, []string{"table", "_table_old", "_table_new", "table"}, nil},
 }
@@ -428,9 +449,9 @@ var dropTriggersTests = []struct {
 	expectedWriteQuery string
 }{
 	// fail to run the read query
-	{ErrQueryFailed, nil, nil, ErrQueryFailed, ""},
+	{ErrQueryFailed{}, nil, nil, ErrQueryFailed{}, ""},
 	// fail to run the write query
-	{nil, ErrQueryFailed, map[string][]string{"trigger_name": []string{"t1"}}, ErrQueryFailed, "DROP TRIGGER IF EXISTS `db`.`t1`"},
+	{nil, ErrQueryFailed{}, map[string][]string{"trigger_name": []string{"t1"}}, ErrQueryFailed{}, "DROP TRIGGER IF EXISTS `db`.`t1`"},
 	// successfully drop a trigger
 	{nil, nil, map[string][]string{"trigger_name": []string{"t1"}}, nil, "DROP TRIGGER IF EXISTS `db`.`t1`"},
 }
@@ -470,7 +491,7 @@ var moveToPendingDropsTests = []struct {
 	expectedError   error
 }{
 	// fail to run the query
-	{"table1", "table1_old", ErrQueryFailed, ErrQueryFailed},
+	{"table1", "table1_old", ErrQueryFailed{}, ErrQueryFailed{}},
 	// succeed
 	{"table", "table1_old", nil, nil},
 }
@@ -510,11 +531,11 @@ var cleanUpTests = []struct {
 	expectedError     error
 }{
 	// error dropping triggers
-	{ErrQueryFailed, nil, "", "", nil, ErrQueryFailed},
+	{ErrQueryFailed{}, nil, "", "", nil, ErrQueryFailed{}},
 	// error getting mig table
 	{nil, ErrStateFile, "", "", nil, ErrStateFile},
 	// error moving to pending drops
-	{nil, nil, "_t1_new", "20150826_t1_new", ErrQueryFailed, ErrQueryFailed},
+	{nil, nil, "_t1_new", "20150826_t1_new", ErrQueryFailed{}, ErrQueryFailed{}},
 	// success
 	{nil, nil, "_t1_new", "20150826_t1_new", nil, nil},
 }
@@ -564,7 +585,7 @@ var runWriteQueryTests = []struct {
 	expectedError error
 }{
 	// fail to execute insert
-	{1, "insert into table", ErrQueryFailed},
+	{1, "insert into table", ErrQueryFailed{}},
 	// successfully execute insert
 	{0, "insert into table", nil},
 }
@@ -577,8 +598,15 @@ func TestRunWriteQuery(t *testing.T) {
 
 		actualError := migration.RunWriteQuery(tt.query)
 		expectedError := tt.expectedError
-		if actualError != expectedError {
-			t.Errorf("error = %v, want %v", actualError, expectedError)
+		switch actualError.(type) {
+		default:
+			if actualError != expectedError {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
+		case ErrQueryFailed:
+			if _, ok := expectedError.(ErrQueryFailed); !ok {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
 		}
 	}
 }
@@ -591,7 +619,7 @@ var runReadQueryTests = []struct {
 	expectedError    error
 }{
 	// fail to execute query
-	{1, map[string][]string{"count": []string{"1"}}, nil, ErrQueryFailed},
+	{1, map[string][]string{"count": []string{"1"}}, nil, ErrQueryFailed{}},
 	// successfully execute query
 	{0, map[string][]string{"count": []string{"1"}}, map[string][]string{"count": []string{"1"}}, nil},
 }
@@ -605,8 +633,15 @@ func TestRunReadQuery(t *testing.T) {
 
 		actualResponse, actualError := migration.RunReadQuery("select count(*) as count from table")
 		expectedError := tt.expectedError
-		if actualError != expectedError {
-			t.Errorf("error = %v, want %v", actualError, expectedError)
+		switch actualError.(type) {
+		default:
+			if actualError != expectedError {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
+		case ErrQueryFailed:
+			if _, ok := expectedError.(ErrQueryFailed); !ok {
+				t.Errorf("error = %v, want %v", actualError, expectedError)
+			}
 		}
 
 		expectedResponse := tt.expectedResponse
