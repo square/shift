@@ -18,7 +18,12 @@
 <% if show_failure? %>
 <div class="col-md-12 col-md-offsets-3">
   <div class="alert alert-danger col-md-8 col-md-offset-2">
-    Error message: <%= @migration[:error_message] %>
+    Error message: <%= @migration[:error_message] %>.
+    <% if use_ptosc? %>
+      <br />
+      <br />
+      It might be useful to look at the pt-osc log file <%= link_to "here", '/shift_file/' + @migration.id.to_s + '?file_type=' + ShiftFile.file_types[:log].to_s %>.
+    <% end %>
   </div>
 </div>
 <% end %>
