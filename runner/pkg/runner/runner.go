@@ -912,7 +912,8 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 	commandOptions = make([]string, 0)
 
 	if currentMigration.Status == migration.PrepMigrationStatus {
-		commandOptions = append(commandOptions, "--alter", alterStatement, "--dry-run", "-h", currentMigration.Host,
+		commandOptions = append(commandOptions, "--alter", alterStatement, "--dry-run",
+			"-h", currentMigration.Host, "-P", strconv.Itoa(currentMigration.Port),
 			"--defaults-file", runner.MysqlDefaultsFile, dsn)
 	} else if currentMigration.Status == migration.RunMigrationStatus {
 		// specify config file if it is defined. Options specified via command line will overwrite
@@ -928,7 +929,8 @@ func (runner *runner) generatePtOscCommand(currentMigration *migration.Migration
 				"--set-vars", "wait_timeout=600,lock_wait_timeout=1")
 		}
 
-		commandOptions = append(commandOptions, "--alter", alterStatement, "--execute", "-h", currentMigration.Host,
+		commandOptions = append(commandOptions, "--alter", alterStatement, "--execute",
+			"-h", currentMigration.Host, "-P", strconv.Itoa(currentMigration.Port),
 			"--defaults-file", runner.MysqlDefaultsFile, "--progress", ptOscProgress, "--exit-at", "copy",
 			"--save-state", currentMigration.StateFile)
 
