@@ -70,6 +70,12 @@ RSpec.describe Form::NewMigrationRequest do
       expect(request).to have_error_on(:pr_url)
     end
 
+    it 'validates format of pr url' do
+      request = build(pr_url: "javascript:alert('hi')")
+      expect(request.valid?).to eq(false)
+      expect(request).to have_error_on(:pr_url)
+    end
+
     it 'validates positive integerness of max threads running' do
       request = build(max_threads_running: -1)
       expect(request.valid?).to eq(false)
