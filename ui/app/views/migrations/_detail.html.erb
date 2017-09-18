@@ -78,7 +78,7 @@
         <div class="col-md-6"><%= link_to @migration.meta_request_id, "/meta_requests/" + @migration.meta_request_id.to_s %></div>
       <% end %>
     <% elsif field == "pr_url" %>
-      <div class="col-md-6 wrap-text"><%= link_to @migration.pr_url, @migration.pr_url %></div>
+      <div class="col-md-6 wrap-text"><%= sanitize link_to @migration.pr_url, @migration.pr_url %></div>
     <% elsif %w(table_size_start index_size_start table_size_end index_size_end).include?(field) %>
       <div class="col-md-6"><%= number_to_human_size(@migration[field]) %></div>
     <% elsif %w(table_rows_start table_rows_end).include?(field) %>

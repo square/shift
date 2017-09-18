@@ -63,6 +63,7 @@ module Form
     validates_numericality_of :max_replication_lag, greater_than: 0
     # don't allow semicolons anywhere
     validates_format_of :database, :with => /\A[^;]+\Z/
+    validates_format_of :pr_url, :with => /\A^(?!javascript:).+\Z/ # XSS
 
     validates_with SQLValidator, fields: [:ddl_statement]
     validates_format_of :final_insert, :with => /\A(?i)(INSERT\s+INTO\s+)[^;]+\Z/i, :allow_blank => true
