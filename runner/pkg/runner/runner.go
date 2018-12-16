@@ -22,7 +22,7 @@ import (
 	"github.com/square/shift/runner/pkg/rest"
 
 	"github.com/square/shift/runner/Godeps/_workspace/src/github.com/golang/glog"
-	"github.com/square/shift/runner/Godeps/_workspace/src/gopkg.in/yaml.v2"
+	yaml "github.com/square/shift/runner/Godeps/_workspace/src/gopkg.in/yaml.v2"
 )
 
 const (
@@ -37,6 +37,7 @@ const (
 var (
 	statusesToRun = []int{migration.PrepMigrationStatus, migration.RunMigrationStatus,
 		migration.RenameTablesStatus, migration.CancelStatus, migration.PauseStatus}
+
 	// track pt-osc execs, which may need to be canceled/killed
 	runningMigrations           = map[int]int{} // {id: pid}
 	runningMigMutex             = &sync.Mutex{}
@@ -146,7 +147,29 @@ func newRunner(configFile string) (*runner, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = yaml.Unmarshal(data, &runner)
+		err = yaml.Unmarshal([]byte(os.ExpandEnv(string(data))), &runner)
+		if err != nil {
+			glog.Infoln(err.Error())
+			return nil, err
+		}
+	}
+
+	_, err := os.Stat(runner.MysqlDefaultsFile)
+	if !os.IsExist(err) {
+		mysqlCntContent := fmt.Sprintf(
+			"[client]\n"+
+				"user=%v\npassword=%v", runner.MysqlUser, runner.MysqlPassword)
+
+		if runner.MysqlCert != "" {
+			mysqlCntContent = mysqlCntContent + "\n" +
+				fmt.Sprintf("ssl=1\n"+
+					"ssl-cert=%v\n"+
+					"ssl-key=%v\n"+
+					"ssl-ca=%v", runner.MysqlCert, runner.MysqlKey, runner.MysqlRootCA)
+		}
+
+		mysqlCnfData := []byte(mysqlCntContent)
+		err := ioutil.WriteFile(runner.MysqlDefaultsFile, mysqlCnfData, 0644)
 		if err != nil {
 			return nil, err
 		}

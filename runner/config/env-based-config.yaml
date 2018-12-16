@@ -1,0 +1,25 @@
+# config for the database client
+mysql_user: ${SHIFT_MYSQL_USER}
+mysql_password: ${SHIFT_MYSQL_PASSWORD}
+mysql_cert: ${SHIFT_MYSQL_CERT}
+mysql_key: ${SHIFT_MYSQL_KEY}
+mysql_rootCA: ${SHIFT_MYSQL_ROOTCA}
+mysql_defaults_file: ${SHIFT_MYSQL_DEFAULTS_FILE}
+
+# config for the rest client
+rest_api: ${SHIFT_REST_API}
+rest_cert: ${SHIFT_REST_CERT}
+rest_key: ${SHIFT_REST_KEY}
+
+# general config
+log_dir: ${SHIFT_LOG_DIR}
+pt_osc_path: ${SHIFT_PT_OSC_PATH}
+pending_drops_db: ${SHIFT_PENDING_DROPS_DB}
+log_sync_interval: 10
+state_sync_interval: 10
+stop_file_path: ${SHIFT_STOP_FILE_PATH}
+
+# optionally override the host/port/db to run an OSC on
+host_override: ${SHIFT_HOST_OVERRIDE}
+port_override: ${SHIFT_PORT_OVERRIDE}
+database_override: ${DATABASE_OVERRIDE}

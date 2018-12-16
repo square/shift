@@ -1,0 +1,41 @@
+version: '3'
+services:
+  db:
+    image: mysql:5.7
+    volumes:
+      - ./tmp/db:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+  shift-ui:
+    build: ./ui
+    volumes:
+      - /var/log/shift:/var/log/shift
+    ports:
+      - "3000:3000"
+    environment:
+      - RAILS_ENV=production
+      - SECRET_KEY_BASE=some_random_30_char_string
+      - DATABASE_URL=mysql2://root:root@db/shift?pool=30&timeout=5000
+      - SHIFT_ADMINS=cadl,admin,UNKNOWN
+      - RAILS_SERVE_STATIC_FILES=1
+      - SHIFT_LOG_DIR=/var/log/shift/
+    depends_on:
+      - db
+    command: bundle exec rails server -b '0.0.0.0'
+
+  shift-runner:
+    build: ./runner
+    volumes:
+      - /var/log/shift:/var/log/shift
+      - /var/lib/shift:/var/lib/shift
+    environment:
+      - SHIFT_MYSQL_USER=root
+      - SHIFT_MYSQL_PASSWORD=root
+      - SHIFT_MYSQL_DEFAULTS_FILE=config/my_env-based.cnf
+      - SHIFT_REST_API=http://shift-ui:3000/api/v1/
+      - SHIFT_LOG_DIR=/var/log/shift/
+      - SHIFT_PT_OSC_PATH=/usr/bin/pt-online-schema-change
+      - SHIFT_STOP_FILE_PATH=/var/lib/shift/stop_runner
+    depends_on:
+      - shift-ui
+    command: go run main.go -logtostderr

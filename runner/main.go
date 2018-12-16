@@ -21,15 +21,13 @@ func main() {
 		return
 	}
 	environment := os.Getenv("ENVIRONMENT")
-	switch {
-	default:
-		configFile = wd + "/config/development-config.yaml"
-	case environment == "staging":
-		configFile = wd + "/config/staging-config.yaml"
-	case environment == "production":
-		configFile = wd + "/config/production-config.yaml"
+	if environment == "" {
+		environment = "development"
 	}
 
+	configFile = wd + "/config/" + environment + "-config.yaml"
+	os.Stderr.WriteString(environment + "\n")
+	os.Stderr.WriteString(configFile + "\n")
 	err = runner.Start(configFile)
 	if err != nil {
 		log.Fatalf("Error creating migration runner (error: %s).", err)

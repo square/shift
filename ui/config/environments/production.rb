@@ -29,7 +29,7 @@ Rails.application.configure do
   # config.assets.css_compressor = :sass
 
   # Do not fallback to assets pipeline if a precompiled asset is missed.
-  config.assets.compile = false
+  config.assets.compile = true
 
   # Asset digests allow you to set far-future HTTP expiration dates on all assets,
   # yet still be able to expire them through the digest params.
@@ -42,10 +42,7 @@ Rails.application.configure do
   # config.action_dispatch.x_sendfile_header = 'X-Accel-Redirect' # for NGINX
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  config.force_ssl = true
-  config.ssl_options = {
-    exclude: ->(env) { env['PATH_INFO'] == '/_status' }
-  }
+  config.force_ssl = false
 
   # Use the lowest log level to ensure availability of diagnostic information
   # when problems arise.
@@ -94,18 +91,19 @@ Rails.application.configure do
   # read-only credentials for shift to connect to and inspect all hosts
   config.x.mysql_helper.db_config = {
     :username => "root",
+    :password => "root"
   }
   # databases to exclude running oscs on
-  config.x.mysql_helper.db_blacklist =
-    ["information_schema", "mysql", "performance_schema", "_pending_drops",
-     "common_schema"]
+  config.x.mysql_helper.db_blacklist = (ENV['DB_BLACKLIST'] || 'information_schema,mysql,performance_schema,_pending_drops,common_schema').split(',')
 
   ## mailer stuff
-  config.x.mailer.default_from = "shift@your_domain"
-  config.x.mailer.default_to = "your_local_name"
-  config.x.mailer.default_to_domain = "@your_domain"
+  config.x.mailer.default_from = ENV['MAILER_DEFAULT_FROM'] || 'shift@your_domain'
+  config.x.mailer.default_to = ENV['MAILER_DEFAULT_TO'] || 'your_local_name'
+  config.x.mailer.default_to_domain = ENV['MAILER_DEFAULT_TO_DOMAIN'] || '@your_domain'
+
+  config.x.admins = (ENV['SHIFT_ADMINS'] || "").split(",").map(&:upcase)
 
   ## ptosc
   # root path for pt-osc output logs. specified within shift-runner
-  config.x.ptosc.log_dir = "/tmp/shift/"
+  config.x.ptosc.log_dir = ENV['SHIFT_LOG_DIR'] || "/tmp/shift/"
 end
