@@ -12,4 +12,4 @@ RUN godep get ./...
 
 ENV ENVIRONMENT env-based
 
-CMD ["go", "run", "main.go", "-logtostderr"]8
+CMD ["go", "run", "main.go", "-logtostderr"]

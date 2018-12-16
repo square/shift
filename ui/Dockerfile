@@ -9,6 +9,5 @@ COPY Gemfile.lock /shift-ui/Gemfile.lock
 RUN bundle install
 
 COPY . /shift-ui
-# RUN bundle exec rake db:setup
 
 EXPOSE 3000

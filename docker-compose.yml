@@ -18,6 +18,8 @@ services:
       - DATABASE_URL=mysql2://root:root@db/shift?pool=30&timeout=5000
       - SHIFT_ADMINS=cadl,admin,UNKNOWN
       - RAILS_SERVE_STATIC_FILES=1
+      - INSPECTION_DB_USER=root
+      - INSPECTION_DB_PASSWORD=root
       - SHIFT_LOG_DIR=/var/log/shift/
     depends_on:
       - db
