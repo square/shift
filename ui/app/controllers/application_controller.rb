@@ -9,11 +9,15 @@ class ApplicationController < ActionController::Base
 
   private
 
-  # TODO: hook this up with your own authentication system
   def current_user
+    dn = request.headers["x-ssl-client-s-dn"] || ""
+    who_pair = dn.split(",").find{|i| i.start_with?("CN=")}
+    who = who_pair ? who_pair.split("=")[1].upcase: "UNKNOWN"
+
+    is_admin = Rails.configuration.x.admins.include?(who)
     @current_user = {
-      :username => "admin",
-      :capabilities => ["admin"],
+      :username => who,
+      :capabilities => is_admin ? ["admin"]: [],
     }
   end
 
@@ -31,7 +35,7 @@ class ApplicationController < ActionController::Base
   end
 
   def user_is_admin?
-    (current_user[:capabilities].include? 'admin') || Rails.env.development?
+    (current_user[:capabilities].include? 'admin')
   end
   helper_method :user_is_admin?
 
