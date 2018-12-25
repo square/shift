@@ -1145,7 +1145,7 @@ func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.
 		}
 		_, err := runner.RestClient.Update(urlParams)
 		if err != nil {
-			glog.Errorf("mig_id=%d: error updating copy percentage (error: %s). Continuing anyway", migrationId, err)
+			glog.Errorf("mig_id=%s: error updating copy percentage (error: %s). Continuing anyway", migrationId, err)
 		}
 	}
 }
