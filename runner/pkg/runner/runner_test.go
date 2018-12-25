@@ -55,7 +55,7 @@ var (
 
 func validTableStatsPayload(id, startOrEnd string) map[string]string {
 	return map[string]string{
-		"id": id,
+		"id":                       id,
 		"table_rows_" + startOrEnd: "5",
 		"table_size_" + startOrEnd: "98",
 		"index_size_" + startOrEnd: "32",
@@ -921,6 +921,7 @@ var runMigrationDirectDropTests = []struct {
 	runType            int
 	mode               int
 	action             int
+	enableTrash        bool
 	dropTriggersError  error
 	directDropError    error
 	moveToPendingError error
@@ -929,17 +930,19 @@ var runMigrationDirectDropTests = []struct {
 	expectedPayload    map[string]string
 }{
 	// fail to drop the triggers
-	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, migration.ErrQueryFailed{}, nil, nil, nil, migration.ErrQueryFailed{}, nil},
+	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, true, migration.ErrQueryFailed{}, nil, nil, nil, migration.ErrQueryFailed{}, nil},
 	// fail to directly drop a view alter ddl
-	{0, validDirectDdl3, migration.SHORT_RUN, migration.VIEW_MODE, migration.DROP_ACTION, nil, migration.ErrDirectDrop, nil, nil, migration.ErrDirectDrop, nil},
+	{0, validDirectDdl3, migration.SHORT_RUN, migration.VIEW_MODE, migration.DROP_ACTION, true, nil, migration.ErrDirectDrop, nil, nil, migration.ErrDirectDrop, nil},
 	// fail to directly drop a view normal alter
-	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, migration.ErrQueryFailed{}, nil, migration.ErrQueryFailed{}, nil},
+	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, true, nil, nil, migration.ErrQueryFailed{}, nil, migration.ErrQueryFailed{}, nil},
 	// fail running the final insert
-	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, migration.ErrQueryFailed{}, migration.ErrQueryFailed{}, nil},
+	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, true, nil, nil, nil, migration.ErrQueryFailed{}, migration.ErrQueryFailed{}, nil},
 	// fail completing the migration
-	{2, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
+	{2, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, true, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
 	// succeed
-	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
+	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, true, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
+	// succeed without trash
+	{0, validDirectDdl2, migration.SHORT_RUN, migration.TABLE_MODE, migration.DROP_ACTION, false, nil, nil, migration.ErrQueryFailed{}, nil, nil, map[string]string{"id": "7"}},
 }
 
 func TestRunMigrationDirectDrop(t *testing.T) {
@@ -953,6 +956,7 @@ func TestRunMigrationDirectDrop(t *testing.T) {
 			RunType:      tt.runType,
 			Mode:         tt.mode,
 			Action:       tt.action,
+			EnableTrash:  tt.enableTrash,
 		}
 
 		DropTriggers = func(*migration.Migration, string) error {
@@ -964,8 +968,11 @@ func TestRunMigrationDirectDrop(t *testing.T) {
 		MoveToPendingDrops = func(*migration.Migration, string, string) error {
 			return tt.moveToPendingError
 		}
-		RunWriteQuery = func(*migration.Migration, string, ...interface{}) (err error) {
-			return tt.finalInsertError
+		RunWriteQuery = func(mig *migration.Migration, query string, args ...interface{}) (err error) {
+			if query == finalInsert {
+				return tt.finalInsertError
+			}
+			return nil
 		}
 
 		expectedError := tt.expectedError
@@ -1039,6 +1046,7 @@ func TestRunMigrationPtOsc(t *testing.T) {
 var renameTablesStepTests = []struct {
 	update             int
 	complete           int
+	enableTrash        bool
 	tableStats         *migration.TableStats
 	swapOscTablesError error
 	tableStatsError    error
@@ -1049,36 +1057,41 @@ var renameTablesStepTests = []struct {
 	expectedPayload    map[string]string
 }{
 	// fail running swap tables
-	{0, 0, &validTableStats, migration.ErrQueryFailed{}, nil, nil, nil, nil, migration.ErrQueryFailed{}, nil},
+	{0, 0, true, &validTableStats, migration.ErrQueryFailed{}, nil, nil, nil, nil, migration.ErrQueryFailed{}, nil},
 	// fail dropping the triggers
-	{0, 0, &validTableStats, nil, nil, nil, migration.ErrQueryFailed{}, nil, migration.ErrQueryFailed{}, nil},
+	{0, 0, true, &validTableStats, nil, nil, nil, migration.ErrQueryFailed{}, nil, migration.ErrQueryFailed{}, nil},
 	// fail moving to pending drops
-	{0, 0, &validTableStats, nil, nil, nil, nil, migration.ErrQueryFailed{}, migration.ErrQueryFailed{}, nil},
+	{0, 0, true, &validTableStats, nil, nil, nil, nil, migration.ErrQueryFailed{}, migration.ErrQueryFailed{}, nil},
 	// fail getting table stats
-	{0, 0, &validTableStats, nil, migration.ErrQueryFailed{}, nil, nil, nil, migration.ErrQueryFailed{}, nil},
+	{0, 0, true, &validTableStats, nil, migration.ErrQueryFailed{}, nil, nil, nil, migration.ErrQueryFailed{}, nil},
 	// fail updating the migration
-	{2, 0, &validTableStats, nil, nil, nil, nil, nil, ErrUpdate, validTableStatsPayload("7", "end")},
+	{2, 0, true, &validTableStats, nil, nil, nil, nil, nil, ErrUpdate, validTableStatsPayload("7", "end")},
 	// fail running the final insert
-	{0, 0, &validTableStats, nil, nil, migration.ErrQueryFailed{}, nil, nil, migration.ErrQueryFailed{}, validTableStatsPayload("7", "end")},
+	{0, 0, true, &validTableStats, nil, nil, migration.ErrQueryFailed{}, nil, nil, migration.ErrQueryFailed{}, validTableStatsPayload("7", "end")},
 	// fail to complete the migration
-	{0, 2, &validTableStats, nil, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
+	{0, 2, true, &validTableStats, nil, nil, nil, nil, nil, ErrComplete, map[string]string{"id": "7"}},
 	// successfully complete the migration
-	{0, 0, &validTableStats, nil, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
+	{0, 0, true, &validTableStats, nil, nil, nil, nil, nil, nil, map[string]string{"id": "7"}},
+	// successfully complete the migration withou trash
+	{0, 0, false, &validTableStats, nil, nil, nil, nil, migration.ErrQueryFailed{}, nil, map[string]string{"id": "7"}},
 }
 
 func TestRenameTablesStep(t *testing.T) {
 	for _, tt := range renameTablesStepTests {
 		payloadReceived = nil
 		currentRunner := initRunner(stubRestClient{update: tt.update, complete: tt.complete}, "", "", "")
-		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert, Database: "db1", FilesDir: "id-7", StateFile: "id-7/statefile.txt", LogFile: "id-7/ptosc-output.log"}
+		mig := &migration.Migration{Id: 7, FinalInsert: finalInsert, Database: "db1", FilesDir: "id-7", StateFile: "id-7/statefile.txt", LogFile: "id-7/ptosc-output.log", EnableTrash: tt.enableTrash}
 		SwapOscTables = func(*migration.Migration) (string, error) {
 			return "_tablename_new", tt.swapOscTablesError
 		}
 		CollectTableStats = func(*migration.Migration) (*migration.TableStats, error) {
 			return tt.tableStats, tt.tableStatsError
 		}
-		RunWriteQuery = func(*migration.Migration, string, ...interface{}) error {
-			return tt.finalInsertError
+		RunWriteQuery = func(mig *migration.Migration, query string, args ...interface{}) error {
+			if query == finalInsert {
+				return tt.finalInsertError
+			}
+			return nil
 		}
 		var actualOldTable string
 		DropTriggers = func(mig *migration.Migration, oldTable string) error {
@@ -1087,6 +1100,10 @@ func TestRenameTablesStep(t *testing.T) {
 		}
 		MoveToPendingDrops = func(*migration.Migration, string, string) error {
 			return tt.moveToPendingError
+		}
+
+		MoveToBlackHole = func(*migration.Migration, string) error {
+			return nil
 		}
 
 		expectedError := tt.expectedError
