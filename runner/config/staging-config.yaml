@@ -15,6 +15,7 @@ rest_key:
 log_dir: /tmp/shift/
 pt_osc_path: pt-online-schema-change
 pending_drops_db:
+enable_trash: true
 log_sync_interval: 10
 state_sync_interval: 10
 stop_file_path: /tmp/stop_shift_runner

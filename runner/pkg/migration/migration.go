@@ -69,6 +69,7 @@ var (
 	RunWriteQuery            = (*Migration).RunWriteQuery
 	DirectDrop               = (*Migration).DirectDrop
 	MoveToPendingDrops       = (*Migration).MoveToPendingDrops
+	MoveToBlackHole          = (*Migration).MoveToBlackHole
 	DropTriggers             = (*Migration).DropTriggers
 	CleanUp                  = (*Migration).CleanUp
 	TimestampedTable         = timestampedTable
@@ -91,6 +92,7 @@ type Migration struct {
 	RunType        int
 	Mode           int
 	Action         int
+	EnableTrash    bool
 	PendingDropsDb string
 	CustomOptions  map[string]string
 }
@@ -296,6 +298,12 @@ func (migration *Migration) MoveToPendingDrops(sourceTable, destTable string) er
 	return nil
 }
 
+// MoveToBlackhole drops the table
+func (migration *Migration) MoveToBlackHole(table string) error {
+	query := "DROP TABLE " + table
+	return RunWriteQuery(migration, query)
+}
+
 // TimestampedTable prefixes a table name with a timestamp
 func timestampedTable(table string) string {
 	t := time.Now()
@@ -322,8 +330,13 @@ func (migration *Migration) CleanUp() error {
 	if err != nil {
 		return err
 	}
-	pdTable := TimestampedTable(migTable)
-	err = MoveToPendingDrops(migration, migTable, pdTable)
+	if migration.EnableTrash {
+		pdTable := TimestampedTable(migTable)
+		err = MoveToPendingDrops(migration, migTable, pdTable)
+	} else {
+		err = MoveToBlackHole(migration, migTable)
+	}
+
 	if err != nil {
 		return err
 	}

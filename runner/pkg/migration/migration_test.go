@@ -525,24 +525,32 @@ func TestMoveToPendingDrops(t *testing.T) {
 var cleanUpTests = []struct {
 	dropTriggersError error
 	getMigTableError  error
+	enableTrash       bool
 	migTable          string
 	pdTable           string
 	moveToPDError     error
+	moveToBHError     error
 	expectedError     error
 }{
 	// error dropping triggers
-	{ErrQueryFailed{}, nil, "", "", nil, ErrQueryFailed{}},
+	{ErrQueryFailed{}, nil, true, "", "", nil, nil, ErrQueryFailed{}},
 	// error getting mig table
-	{nil, ErrStateFile, "", "", nil, ErrStateFile},
+	{nil, ErrStateFile, true, "", "", nil, nil, ErrStateFile},
 	// error moving to pending drops
-	{nil, nil, "_t1_new", "20150826_t1_new", ErrQueryFailed{}, ErrQueryFailed{}},
+	{nil, nil, true, "_t1_new", "20150826_t1_new", ErrQueryFailed{}, nil, ErrQueryFailed{}},
+	// error moving to blackhole
+	{nil, nil, false, "_t1_new", "20150826_t1_new", nil, ErrQueryFailed{}, ErrQueryFailed{}},
+	// success with trash
+	{nil, nil, true, "_t1_new", "20150826_t1_new", nil, ErrQueryFailed{}, nil},
+	// success without trash
+	{nil, nil, false, "_t1_new", "20150826_t1_new", ErrQueryFailed{}, nil, nil},
 	// success
-	{nil, nil, "_t1_new", "20150826_t1_new", nil, nil},
+	{nil, nil, true, "_t1_new", "20150826_t1_new", nil, nil, nil},
 }
 
 func TestCleanUp(t *testing.T) {
 	for _, tt := range cleanUpTests {
-		migration := &Migration{Table: "t1"}
+		migration := &Migration{Table: "t1", EnableTrash: tt.enableTrash}
 
 		DropTriggers = func(mig *Migration, table string) error {
 			if table != "t1" {
@@ -568,6 +576,12 @@ func TestCleanUp(t *testing.T) {
 			}
 
 			return tt.moveToPDError
+		}
+		MoveToBlackHole = func(mig *Migration, table string) error {
+			if table != tt.migTable {
+				t.Errorf("dropped table = %v, want %v", table, tt.migTable)
+			}
+			return tt.moveToBHError
 		}
 
 		actualError := migration.CleanUp()

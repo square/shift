@@ -70,6 +70,7 @@ var (
 	DirectDrop          = (*migration.Migration).DirectDrop
 	SwapOscTables       = (*migration.Migration).SwapOscTables
 	MoveToPendingDrops  = (*migration.Migration).MoveToPendingDrops
+	MoveToBlackHole     = (*migration.Migration).MoveToBlackHole
 	CleanUp             = (*migration.Migration).CleanUp
 	RunWriteQuery       = (*migration.Migration).RunWriteQuery
 
@@ -98,6 +99,7 @@ type runner struct {
 	MysqlDefaultsFile string `yaml:"mysql_defaults_file"`
 	LogDir            string `yaml:"log_dir"`
 	PendingDropsDb    string `yaml:"pending_drops_db"`
+	EnableTrash       bool   `yaml:"enable_trash"`
 	PtOscPath         string `yaml:"pt_osc_path"`
 	HostOverride      string `yaml:"host_override"`
 	PortOverride      int    `yaml:"port_override"`
@@ -313,6 +315,7 @@ func (runner *runner) unstageRunnableMigration(currentMigration rest.RestRespons
 			StateFile:      stateFile,
 			LogFile:        logFile,
 			PendingDropsDb: runner.PendingDropsDb,
+			EnableTrash:    runner.EnableTrash,
 			CustomOptions:  customOptions,
 		}
 
@@ -533,12 +536,19 @@ func (runner *runner) runMigrationDirectDrop(currentMigration *migration.Migrati
 			return
 		}
 	} else {
-		// rename old table to the pending_drops database instead of actually
-		// dropping it
-		pdTable := migration.TimestampedTable(currentMigration.Table)
-		err = MoveToPendingDrops(currentMigration, currentMigration.Table, pdTable)
-		if err != nil {
-			return
+		if currentMigration.EnableTrash {
+			// rename old table to the pending_drops database instead of actually
+			// dropping it
+			pdTable := migration.TimestampedTable(currentMigration.Table)
+			err = MoveToPendingDrops(currentMigration, currentMigration.Table, pdTable)
+			if err != nil {
+				return
+			}
+		} else {
+			err = DirectDrop(currentMigration)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -626,11 +636,19 @@ func (runner *runner) renameTablesStep(currentMigration *migration.Migration) er
 	if err != nil {
 		return err
 	}
-	// rename old table to pending_drops database.
-	// if the pending_drops database is the same as the database for the
-	// migration, skip this step.
-	if currentMigration.Database != currentMigration.PendingDropsDb {
-		err = MoveToPendingDrops(currentMigration, oldTable, oldTable)
+	if currentMigration.EnableTrash {
+		// rename old table to pending_drops database.
+		// if the pending_drops database is the same as the database for the
+		// migration, skip this step.
+		if currentMigration.Database != currentMigration.PendingDropsDb {
+			err = MoveToPendingDrops(currentMigration, oldTable, oldTable)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// trash disabled, just drop oldtable
+		err = MoveToBlackHole(currentMigration, oldTable)
 		if err != nil {
 			return err
 		}
@@ -1145,7 +1163,7 @@ func (runner *runner) updateMigrationCopyPercentage(currentMigration *migration.
 		}
 		_, err := runner.RestClient.Update(urlParams)
 		if err != nil {
-			glog.Errorf("mig_id=%d: error updating copy percentage (error: %s). Continuing anyway", migrationId, err)
+			glog.Errorf("mig_id=%s: error updating copy percentage (error: %s). Continuing anyway", migrationId, err)
 		}
 	}
 }
