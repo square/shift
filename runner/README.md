@@ -57,6 +57,7 @@ Here are the configuration files that you will probably want to update (although
   * `rest_key`: if applicable, the key needed to connect to the shift api
   * `log_dir`: the directory where the pt-osc state and output for all migrations will be stored
   * `pt_osc_path`: the path to the patched version of pt-osc
+  * `enable_trash`: if true, the runner will duplicate the original table into `pending_drops_db` with a timestamp prefix name after non-shortrun alter/drop table.
   * `pending_drops_db`: the name of the pending drops (trash can) db. If this isn't specified, old tables won't be renamed out of their original database
   * `log_sync_interval`: interval in seconds for uploading pt-osc log files to the ui
   * `state_sync_interval`: same as above, but for pt-osc state files
