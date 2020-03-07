@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/square/shift/runner/Godeps/_workspace/src/github.com/golang/glog"
 )
 
 var (
@@ -110,6 +112,7 @@ func (restClient *restClient) post(resource string, urlParams map[string]string)
 	decoder := json.NewDecoder(resp.Body)
 	var response map[string]interface{}
 	if err = decoder.Decode(&response); err != nil {
+		glog.Warning("Errer decoding response. Status: %d. Body: %s", resp.Status, resp.Body)
 		return nil, err
 	}
 	return response, nil
