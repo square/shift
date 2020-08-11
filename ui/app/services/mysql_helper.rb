@@ -25,6 +25,7 @@ class MysqlHelper
           :connect_timeout => 5})
       @client = Mysql2::Client.new(config)
     rescue Mysql2::Error => e
+      config = config.symbolize_keys # prevent inconsistent string/symbol usage from exposing passwords
       config[:password] = "*****" if config[:password]
       raise MysqlError, "Problem establishing mysql connection (error: #{e}) (connection info: #{config})"
     end
