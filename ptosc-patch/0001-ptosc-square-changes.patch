@@ -1,6 +1,6 @@
---- pt-online-schema-change       2017-07-17 09:46:31.000000000 -0700
-+++ pt-online-schema-change       2017-07-17 09:46:31.000000000 -0700
-@@ -27,6 +27,7 @@
+--- pt-online-schema-change
++++ pt-online-schema-change
+@@ -28,6 +28,7 @@ BEGIN {
        TableNibbler
        TableParser
        Progress
@@ -8,7 +8,7 @@
        Retry
        Cxn
        MasterSlave
-@@ -3543,6 +3544,11 @@
+@@ -3700,6 +3701,11 @@ sub set_callback {
     $self->{callback} = $callback;
  }
  
@@ -20,10 +20,11 @@
  sub start {
     my ( $self, $start ) = @_;
     $self->{start} = $self->{last_reported} = $start || time();
-@@ -3624,6 +3630,93 @@
+@@ -3780,6 +3786,93 @@ sub _d {
+ # End Progress package
  # ###########################################################################
  
- # ###########################################################################
++# ###########################################################################
 +# State package
 +# Written at Square
 +# ###########################################################################
@@ -110,11 +111,10 @@
 +# End State package
 +# ###########################################################################
 +
-+# ###########################################################################
+ # ###########################################################################
  # Retry package
  # This package is a copy without comments from the original.  The original
- # with comments and its test file can be found in the Bazaar repository at,
-@@ -5289,7 +5382,7 @@
+@@ -5666,7 +5759,7 @@ sub new {
  }
  
  sub next {
@@ -123,7 +123,7 @@
  
     if ( !$self->{oktonibble} ) {
        PTDEBUG && _d('Not ok to nibble');
-@@ -5304,7 +5397,7 @@
+@@ -5681,7 +5774,7 @@ sub next {
  
     if ($self->{nibbleno} == 0) {
        $self->_prepare_sths();
@@ -132,7 +132,7 @@
        if ( my $callback = $self->{callbacks}->{init} ) {
           $self->{oktonibble} = $callback->(%callback_args);
           PTDEBUG && _d('init callback returned', $self->{oktonibble});
-@@ -5406,7 +5499,7 @@
+@@ -5802,7 +5895,7 @@ sub set_boundary {
     die "I need a boundary parameter"
        unless $boundary;
     die "Invalid boundary: $boundary"
@@ -141,7 +141,7 @@
     die "I need a values arrayref parameter"
        unless $values && ref $values eq 'ARRAY';
     $self->{$boundary} = $values;
-@@ -5624,7 +5717,7 @@
+@@ -6027,7 +6120,7 @@ sub _prepare_sths {
  }
  
  sub _get_bounds { 
@@ -150,7 +150,7 @@
  
     if ( $self->{one_nibble} ) {
        if ( $self->{resume} ) {
-@@ -5636,6 +5729,13 @@
+@@ -6039,6 +6132,13 @@ sub _get_bounds {
     my $dbh = $self->{Cxn}->dbh();
  
     $self->{first_lower} = $dbh->selectrow_arrayref($self->{first_lb_sql});
@@ -164,7 +164,7 @@
     PTDEBUG && _d('First lower boundary:', Dumper($self->{first_lower}));  
  
     if ( my $nibble = $self->{resume} ) {
-@@ -8005,22 +8105,65 @@
+@@ -8333,22 +8433,65 @@ sub main {
     # on the command line via the DSN.
     my ($db, $tbl);
     my $dsn = shift @ARGV;
@@ -178,7 +178,7 @@
        $db  = $dsn->{D};
 -      $tbl = $dsn->{t};  
 +      $tbl = $dsn->{t};
-    }
++   }
 +   elsif ( !$o->get('load-state') ) {
 +      $o->save_error('A DSN must be specified');
 +   }
@@ -188,7 +188,7 @@
 +   # ########################################################################
 +   my $save_state = $o->get('save-state');
 +   my $load_state = $o->get('load-state');
- 
++
 +   my ($loaded_state, $loaded_step, $loaded_row, $loaded_db, $loaded_dsn, $loaded_options);
 +   my ($loaded_orig_table, $loaded_mig_tbl, $loaded_old_tbl, $loaded_tbl_progress);
 +   if ( $load_state ) {
@@ -219,8 +219,8 @@
 +         orig_tbl   => $tbl,
 +         state_file => $save_state,
 +      );
-+   }
-+
+    }
+ 
 +   # ########################################################################
 +   # Continue getting configuration information.
 +   # ########################################################################
@@ -234,8 +234,8 @@
 +
     # Explicit --chunk-size disable auto chunk sizing.
     $o->set('chunk-time', 0) if $o->got('chunk-size');
- 
-@@ -8448,6 +8591,7 @@
+    if (!$o->get('swap-tables') && !$o->get('drop-triggers')) {
+@@ -8889,6 +9032,7 @@ sub main {
     };
  
     check_orig_table(
@@ -243,7 +243,7 @@
        orig_tbl     => $orig_tbl,
        Cxn          => $cxn,
        OptionParser => $o,
-@@ -8676,12 +8820,26 @@
+@@ -9123,12 +9267,26 @@ sub main {
        );
     }
  
@@ -272,7 +272,7 @@
  
     # --plugin hook
    if ( $plugin && $plugin->can('before_create_new_table') ) {
-@@ -8694,6 +8852,7 @@
+@@ -9141,6 +9299,7 @@ sub main {
     my $new_tbl;
     eval {
        $new_tbl = create_new_table(
@@ -280,7 +280,7 @@
           new_table_name   => $new_table_name,
           new_table_prefix => $new_table_prefix,
           orig_tbl         => $orig_tbl,
-@@ -8727,6 +8886,11 @@
+@@ -9174,6 +9333,11 @@ sub main {
               . "the tool was interrupted.  To drop the new table, "
               . "execute:\n$sql\n";
        }
@@ -292,7 +292,7 @@
        elsif ( $orig_tbl->{copied} && !$orig_tbl->{swapped} ) {
           print "Not dropping the new table $new_tbl->{name} because "
               . "--swap-tables failed.  To drop the new table, "
-@@ -8814,7 +8978,10 @@
+@@ -9262,7 +9426,10 @@ sub main {
        );
     }
  
@@ -304,7 +304,7 @@
        print "Altering new table...\n";
        my $sql = "ALTER TABLE $new_tbl->{name} $alter";
        print $sql, "\n" if $o->get('print');
-@@ -8933,6 +9100,16 @@
+@@ -9381,6 +9548,16 @@ sub main {
        );
     }
  
@@ -321,7 +321,7 @@
     # ########################################################################
     # Step 3: Create the triggers to capture changes on the original table and
     # apply them to the new table.
-@@ -8965,6 +9142,11 @@
+@@ -9413,6 +9590,11 @@ sub main {
           . "specified.  To drop the triggers, execute:\n"
           . join("\n", @drop_trigger_sqls) . "\n";
        }
@@ -333,7 +333,7 @@
        else {
           drop_triggers(
              tbl          => $orig_tbl,
-@@ -8985,6 +9167,7 @@
+@@ -9433,6 +9615,7 @@ sub main {
  
     my @trigger_names = eval {
        create_triggers(
@@ -341,7 +341,7 @@
           orig_tbl     => $orig_tbl,
           new_tbl      => $new_tbl,
           del_tbl      => $del_tbl,
-@@ -9006,6 +9189,16 @@
+@@ -9454,6 +9637,16 @@ sub main {
        $plugin->after_create_triggers();
     }
  
@@ -358,7 +358,7 @@
     # #####################################################################
     # Step 4: Copy rows.
     # #####################################################################
-@@ -9014,11 +9207,13 @@
+@@ -9462,11 +9655,13 @@ sub main {
     # to do all the copy work.  The callbacks do not need to eval their work
     # because the higher call to $nibble_iter->next() is eval'ed which will
     # catch any errors in the callbacks.
@@ -377,7 +377,7 @@
  
     my $callbacks = {
        init => sub {
-@@ -9204,16 +9399,12 @@
+@@ -9652,16 +9847,12 @@ sub main {
  
           return unless $o->get('execute');
  
@@ -397,7 +397,7 @@
  
              # Adjust chunk size.  This affects the next chunk.
              if ( $chunk_time ) {
-@@ -9244,10 +9435,62 @@
+@@ -9692,10 +9883,62 @@ sub main {
                 # Update chunk-size based on the rate of rows/s.
                 $nibble_iter->set_chunk_size($tbl->{chunk_size});
              }
@@ -408,7 +408,10 @@
 +            # though so we can accurately update the Progress object.
 +            $total_rows += $tbl->{chunk_size};
 +         }
-+
+ 
+-            # Every table should have a Progress obj; update it.
+-            if ( my $tbl_pr = $tbl->{progress} ) {
+-               $tbl_pr->update( sub { return $total_rows } );
 +         # Update the rate of rows per second for the entire server.
 +         # This is used for the initial chunk size of the next table.
 +         $total_time += $tbl->{nibble_time};
@@ -433,10 +436,7 @@
 +               $last_prog_upd_time = $total_time;
 +            }
 +         }
- 
--            # Every table should have a Progress obj; update it.
--            if ( my $tbl_pr = $tbl->{progress} ) {
--               $tbl_pr->update( sub { return $total_rows } );
++
 +         # Save the primary key value of the last successfully copied row into a file.
 +         # If last_upper is set, that means that all rows have been copied and
 +         # we should save last_upper to the state file
@@ -463,7 +463,7 @@
              }
           }
  
-@@ -9288,6 +9531,9 @@
+@@ -9746,6 +9989,9 @@ sub main {
        tbl                => $orig_tbl,
        chunk_size         => $orig_tbl->{chunk_size},
        chunk_index        => $o->get('chunk-index'),
@@ -473,7 +473,7 @@
        n_chunk_index_cols => $o->get('chunk-index-columns'),
        dml                => $dml,
        select             => $select,
-@@ -9313,8 +9559,15 @@
+@@ -9771,8 +10017,15 @@ sub main {
          && !$nibble_iter->one_nibble()
          &&  $nibble_iter->row_estimate() )
     {
@@ -490,7 +490,7 @@
           spec    => $o->get('progress'),
           name    => "Copying $orig_tbl->{name}",
        );
-@@ -9328,7 +9581,9 @@
+@@ -9786,7 +10039,9 @@ sub main {
     # Start copying rows.  This may take awhile, but --progress is on
     # by default so there will be progress updates to stderr.
     eval {
@@ -501,7 +501,7 @@
     };
     if ( $EVAL_ERROR ) {
        die ts("Error copying rows from $orig_tbl->{name} to "
-@@ -9370,6 +9625,42 @@
+@@ -9835,6 +10090,42 @@ sub main {
        $plugin->after_copy_rows();
     }
  
@@ -544,7 +544,7 @@
     # #####################################################################
     # XXX
     # Step 5: Rename tables: orig -> old, new -> orig
-@@ -9480,14 +9771,27 @@
+@@ -9988,14 +10279,27 @@ sub main {
        }
     }
  
@@ -573,7 +573,7 @@
           print "Not dropping old table because --no-swap-tables was specified.\n";
        }
        else {
-@@ -9508,7 +9812,13 @@
+@@ -10016,7 +10320,13 @@ sub main {
              $cxn->dbh()->do($sql);
           }
  
@@ -588,7 +588,7 @@
           print $sql, "\n" if $o->get('print');
           PTDEBUG && _d($sql); 
           eval {
-@@ -9517,7 +9827,12 @@
+@@ -10025,7 +10335,12 @@ sub main {
           if ( $EVAL_ERROR ) {
              die ts("Error dropping the old table: $EVAL_ERROR\n");
           }
@@ -602,7 +602,7 @@
  
           # --plugin hook
           if ( $plugin && $plugin->can('after_drop_old_table') ) {
-@@ -9821,6 +10136,7 @@
+@@ -10410,6 +10725,7 @@ sub create_new_table {
     }
     my ($new_table_name, $orig_tbl, $cxn, $q, $o, $tp) = @args{@required_args};
     my $new_table_prefix = $args{new_table_prefix};
@@ -610,7 +610,7 @@
  
     # Get the original table struct.
     my $ddl = $tp->get_create_table(
-@@ -9835,6 +10151,17 @@
+@@ -10424,6 +10740,17 @@ sub create_new_table {
     my $tries = $new_table_prefix ? 10 : 1;
     my $tryno = 1;
     my @old_tables;
@@ -628,10 +628,10 @@
     while ( $tryno++ <= $tries ) {
        if ( $new_table_prefix ) {
           $new_table_name = $new_table_prefix . $new_table_name;
-@@ -9929,6 +10256,16 @@
-    elsif ( $o->get('execute') ) {
-       print ts("Swapping tables...\n");
+@@ -10583,6 +10910,15 @@ sub swap_tables {
+       }
  
+       print ts("Swapping tables...\n");
 +      if ( $o->get('swap-table-name') ) {
 +         $table_name = $o->get('swap-table-name');
 +         $table_name =~  s/%T/$orig_tbl->{name}/g;
@@ -641,11 +641,10 @@
 +      } else {
 +         $table_name = $prefix . $table_name;
 +      }
-+
        while ( $name_tries-- ) {
-          $table_name = $prefix . $table_name;
- 
-@@ -9965,6 +10302,7 @@
+        
+          # https://bugs.launchpad.net/percona-toolkit/+bug/1526105
+@@ -10632,6 +10968,7 @@ sub swap_tables {
           if ( my $e = $EVAL_ERROR ) {
              if ( $e =~ $table_exists ) {
                 PTDEBUG && _d($e);
@@ -653,7 +652,7 @@
                 next;
              }
              die ts($e);
-@@ -9988,6 +10326,28 @@
+@@ -10653,6 +10990,28 @@ sub swap_tables {
     }
  }
  
@@ -682,7 +681,7 @@
  sub check_orig_table {
     my ( %args ) = @_;
     my @required_args = qw(orig_tbl Cxn TableParser OptionParser Quoter);
-@@ -9995,6 +10355,7 @@
+@@ -10660,6 +11019,7 @@ sub check_orig_table {
        die "I need a $arg argument" unless $args{$arg};
     }
     my ($orig_tbl, $cxn, $tp, $o, $q) = @args{@required_args};
@@ -690,7 +689,7 @@
  
     my $dbh = $cxn->dbh();
  
-@@ -10008,7 +10369,10 @@
+@@ -10674,7 +11034,10 @@ sub check_orig_table {
             . ' LIKE ' . $q->literal_like($orig_tbl->{tbl});
     PTDEBUG && _d($sql);
     my $triggers = $dbh->selectall_arrayref($sql);
@@ -699,10 +698,10 @@
 +   # are expected to be present.
 +   if ( $triggers && @$triggers &&
 +         (!defined $loaded_step || (defined $loaded_step && !grep { $_ eq $loaded_step } qw(triggers copy rename)))) {
-       die "The table $orig_tbl->{name} has triggers.  This tool "
-          . "needs to create its own triggers, so the table cannot "
-          . "already have triggers.\n";
-@@ -10292,6 +10656,7 @@
+        if ( VersionCompare::cmp($version, '5.7.0') < 0  && VersionCompare::cmp($version, '10.0.0') <= 0) {
+            die "The table $orig_tbl->{name} has triggers.  This tool "
+              . "needs to create its own triggers, so the table cannot "
+@@ -11003,6 +11366,7 @@ sub create_triggers {
        die "I need a $arg argument" unless $args{$arg};
     }
     my ($orig_tbl, $new_tbl, $del_tbl, $cols, $cxn, $q, $o, $retry, $tries, $stats) = @args{@required_args};
@@ -710,21 +709,18 @@
  
     # This sub works for --dry-run and --execute.  With --dry-run it's
     # only interesting if --print is specified, too; then the user can
-@@ -10357,8 +10722,11 @@
-    @drop_trigger_sqls = ();
-    foreach my $trg ( @triggers ) {
-       my ($name, $sql) = @$trg;
--      print $sql, "\n" if $o->get('print');
--      if ( $o->get('execute') ) {
-+      print "$name trigger: $sql\n";
-+      # Don't create triggers if running from a saved state. They should already
-+      # be there.
-+      if ( $o->get('execute') &&
-+         (!defined $loaded_step || (defined $loaded_step && !grep { $_ eq $loaded_step } qw(triggers copy rename)))) {
-          osc_retry(
-             Cxn     => $cxn,
-             Retry   => $retry,
-@@ -10559,11 +10927,12 @@
+@@ -11162,7 +11526,9 @@ sub create_triggers {
+ 
+    foreach my $trigger_info ( @$triggers_info ) {
+        next if !$trigger_info->{new_trigger_sql};
+-       if ( $o->get('execute') ) {
++       # Don't create triggers if running from a saved state. They should already
++       # be there.
++       if ( $o->get('execute') && (!defined $loaded_step || (defined $loaded_step && !grep { $_ eq $loaded_step } qw(triggers copy rename))) ) {
+           osc_retry(
+              Cxn     => $cxn,
+              Retry   => $retry,
+@@ -11431,11 +11797,12 @@ sub exec_nibble {
     );
  
     return osc_retry(
@@ -742,7 +738,7 @@
           # ###################################################################
           # Start timing the query.
           # ###################################################################
-@@ -11265,7 +11634,7 @@
+@@ -12206,7 +12573,7 @@ Drop the new table if copying the original table fails.
  
  Specifying C<--no-drop-new-table> and C<--no-swap-tables> leaves the new,
  altered copy of the table without modifying the original table.  See
@@ -751,9 +747,9 @@
  
  L<--no-drop-new-table> does not work with
  C<alter-foreign-keys-method drop_swap>.
-@@ -11305,6 +11674,16 @@
- 
- This options bypasses confirmation in case of using alter-foreign-keys-method = none , which might break foreign key constraints.
+@@ -12307,6 +12674,16 @@ for every row.
+ To make this scenario vissible to the user, if there are indexes having ENUM fields 
+ with usorted items, it is necessary to specify the C<--force-concat-enums> parameter.
  
 +=item --exit-at
 +
@@ -768,9 +764,9 @@
  =item --help
  
  Show help and exit.
-@@ -11315,6 +11694,19 @@
- 
- Connect to host.
+@@ -12329,6 +12706,19 @@ detected.
+ Default is no Flow Control checking.
+ This option is available for PXC versions 5.6 or higher.
  
 +=item --load-state
 +
@@ -788,18 +784,18 @@
  =item --max-lag
  
  type: time; default: 1s
-@@ -11371,7 +11763,7 @@
+@@ -12438,7 +12828,7 @@ New table name before it is swapped.  C<%T> is replaced with the original
  table name.  When the default is used, the tool prefixes the name with up
  to 10 C<_> (underscore) to find a unique table name.  If a table name is
  specified, the tool does not prefix it with C<_>, so the table must not
 -exist.
 +exist.  See also L<"--swap-table-name">.
  
- =item --password
+ =item --null-to-not-null
  
-@@ -11474,6 +11866,14 @@
- table. Currently, the DSNs are ordered by id, but id and parent_id are otherwise
- ignored.  
+@@ -12590,6 +12980,14 @@ Sets the password to be used to connect to the slaves.
+ It can be used with --slave-user and the password for the user must be the same
+ on all slaves.
  
 +=item --save-state
 +
@@ -812,9 +808,9 @@
  =item --set-vars
  
  type: Array
-@@ -11515,6 +11915,18 @@
- place of the original table.  The original table becomes the "old table," and
- the tool drops it unless you disable L<"--[no]drop-old-table">.
+@@ -12653,6 +13051,18 @@ Using C<--no-swap-tables> will run the whole process, it will create the new
+ table, it will copy all rows but at the end it will drop the new table. It is 
+ intended to run a more realistic L<--dry-run>.
  
 +=item --swap-table-name
 +
@@ -831,7 +827,7 @@
  =item --tries
  
  type: array
-@@ -11574,6 +11986,15 @@
+@@ -12713,6 +13123,15 @@ reconnect.
  
  Failures and retries are recorded in the L<"--statistics">.
  
