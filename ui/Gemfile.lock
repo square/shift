@@ -218,7 +218,7 @@ GEM
       sprockets-rails (>= 2.0, < 4.0)
     websocket-driver (0.6.2)
       websocket-extensions (>= 0.1.0)
-    websocket-extensions (0.1.2)
+    websocket-extensions (0.1.5)
     wkhtmltoimage-binary (0.12.2)
     xpath (2.0.0)
       nokogiri (~> 1.3)
