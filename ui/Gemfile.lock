@@ -92,7 +92,8 @@ GEM
     kaminari (0.16.3)
       actionpack (>= 3.0.0)
       activesupport (>= 3.0.0)
-    kramdown (1.9.0)
+    kramdown (2.3.0)
+      rexml
     less (2.6.0)
       commonjs (~> 0.2.7)
     less-rails (4.0.0)
@@ -157,6 +158,7 @@ GEM
     rdoc (4.2.1)
       json (~> 1.4)
     ref (2.0.0)
+    rexml (3.2.4)
     rspec-core (3.5.0)
       rspec-support (~> 3.5.0)
     rspec-expectations (3.5.0)
