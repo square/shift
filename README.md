@@ -1,5 +1,9 @@
 # shift <img src="/ui/public/logo.png" height="40">
 shift is an application that makes it easy to run online schema migrations for MySQL databases
+
+> [!NOTE]
+> **Shift is no longer under active development.** Its successor is [SchemaBot](https://github.com/block/schemabot), Block's GitOps tool for database schema changes: describe the desired schema in SQL files, open a pull request, and SchemaBot plans, applies, and verifies the change. Online MySQL schema changes run with [Spirit](https://github.com/block/spirit).
+
 <br><br><br>
 <img src="/ui/screenshots/summary.png">
 <br><br><br>
